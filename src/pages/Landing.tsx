@@ -13,7 +13,7 @@ const Landing = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl w-full">
         <Link
-          to="/user"
+          to="/user-login"
           className="group bg-card rounded-2xl p-8 shadow-sm border border-border hover:border-primary hover:shadow-lg transition-all duration-300 text-center"
         >
           <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-4 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
@@ -24,7 +24,7 @@ const Landing = () => {
         </Link>
 
         <Link
-          to="/admin"
+          to="/login?role=admin"
           className="group bg-card rounded-2xl p-8 shadow-sm border border-border hover:border-primary hover:shadow-lg transition-all duration-300 text-center"
         >
           <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-4 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
@@ -35,7 +35,7 @@ const Landing = () => {
         </Link>
 
         <Link
-          to="/billing"
+          to="/login?role=billing"
           className="group bg-card rounded-2xl p-8 shadow-sm border border-border hover:border-primary hover:shadow-lg transition-all duration-300 text-center"
         >
           <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-4 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">

@@ -1,7 +1,9 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
+// Your web app's Firebase configuration
+// REPLACE THESE WITH YOUR ACTUAL FIREBASE PROJECT CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyAIAQnTZkJh6YL5QT7O-BTeZRGyX49nbHc",
   authDomain: "food-service-aa0e5.firebaseapp.com",
@@ -12,7 +14,7 @@ const firebaseConfig = {
   measurementId: "G-RMBJETPZH3"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
 export const auth = getAuth(app);
-export default app;
+export const db = getFirestore(app);

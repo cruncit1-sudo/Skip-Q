@@ -8,6 +8,8 @@ import UserHome from "./pages/UserHome";
 import AdminDashboard from "./pages/AdminDashboard";
 import BillingPage from "./pages/BillingPage";
 import NotFound from "./pages/NotFound";
+import Login from "./components/Login";
+import UserPhoneLogin from "./pages/UserPhoneLogin";
 
 const queryClient = new QueryClient();
 
@@ -19,6 +21,8 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/user-login" element={<UserPhoneLogin />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/user" element={<UserHome />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/billing" element={<BillingPage />} />
