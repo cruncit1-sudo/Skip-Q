@@ -89,17 +89,16 @@ const UserHome = () => {
   const fetchHistory = async () => {
     setLoadingHistory(true);
     try {
+      // "user" field stores phone number without +91 (e.g. "9442879062")
+      const rawNumber = currentUser?.phoneNumber?.replace("+91", "") ?? null;
       let snap;
-      if (currentUser?.phoneNumber) {
-        // Fetch orders matching this phone number
+      if (rawNumber) {
         snap = await getDocs(
-          query(collection(db, "Orders"), where("phoneNumber", "==", currentUser.phoneNumber))
+          query(collection(db, "Orders"), where("user", "==", rawNumber))
         );
       } else {
-        // Fallback: show all orders if no phone number in session
         snap = await getDocs(collection(db, "Orders"));
       }
-      // Sort by createdAt descending in JS
       const orders = snap.docs
         .map(d => ({ id: d.id, ...d.data() } as FirestoreOrder))
         .sort((a, b) => {
@@ -132,7 +131,7 @@ const UserHome = () => {
 
       await addDoc(collection(db, "Orders"), {
         orderId,
-        phoneNumber: currentUser?.phoneNumber ?? null,
+        user: currentUser?.phoneNumber?.replace("+91", "") ?? null,
         items: cart.map(item => ({
           id: item.id, name: item.name, price: item.price,
           type: item.type, cartQuantity: item.cartQuantity,

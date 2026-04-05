@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,21 +73,28 @@ const Login = () => {
       const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
       const uid = credential.user.uid;
 
-      // Step 2: Check role — Staff by uid, Bill by Email query
       const requiredRole = roleConfig[selectedRole].requiredFirestoreRole;
       let firestoreRole: string | null = null;
 
+      // Check Admin collection by uid
+      const adminDoc = await getDoc(doc(db, "Admin", uid));
+      if (adminDoc.exists()) {
+        firestoreRole = adminDoc.data()?.Role;
+      }
+
+      // Check Bill collection by uid
+      if (!firestoreRole) {
+        const billDoc = await getDoc(doc(db, "Bill", uid));
+        if (billDoc.exists()) {
+          firestoreRole = billDoc.data()?.Role;
+        }
+      }
+
       // Check Staff collection by uid
-      const staffDoc = await getDoc(doc(db, "Staff", uid));
-      if (staffDoc.exists()) {
-        firestoreRole = staffDoc.data()?.Role;
-      } else {
-        // Check Bill collection by Email field (document id may differ from uid)
-        const billQuery = await getDocs(
-          query(collection(db, "Bill"), where("Email", "==", email.trim()))
-        );
-        if (!billQuery.empty) {
-          firestoreRole = billQuery.docs[0].data()?.Role;
+      if (!firestoreRole) {
+        const staffDoc = await getDoc(doc(db, "Staff", uid));
+        if (staffDoc.exists()) {
+          firestoreRole = staffDoc.data()?.Role;
         }
       }
 
@@ -111,7 +118,7 @@ const Login = () => {
         return;
       }
 
-      // Step 3: Role matched — navigate
+      // Role matched — navigate
       navigate(roleConfig[selectedRole].destination);
     } catch (err: any) {
       setError(getFirebaseError(err.code));
@@ -143,7 +150,6 @@ const Login = () => {
           <p className="text-muted-foreground text-sm">Sign in to continue</p>
         </div>
 
-        {/* Role selector */}
         {!selectedRole && (
           <div className="space-y-3">
             <p className="text-center text-sm font-medium text-muted-foreground mb-4">Choose your role</p>
@@ -168,7 +174,6 @@ const Login = () => {
           </div>
         )}
 
-        {/* Login form */}
         {selectedRole && config && (
           <Card className="p-6 space-y-5">
             <div className="flex items-center gap-3 pb-3 border-b border-border">
@@ -187,47 +192,27 @@ const Login = () => {
             <div className="space-y-4">
               <div>
                 <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                <Input id="email" type="email" placeholder="you@example.com"
+                  value={email} onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                  className="mt-1"
-                  autoFocus
-                />
+                  className="mt-1" autoFocus />
               </div>
-
               <div>
                 <Label htmlFor="password">Password</Label>
                 <div className="relative mt-1">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={password}
+                  <Input id="password" type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password" value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
+                    className="pr-10" />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
-
               {error && <p className="text-destructive text-sm animate-fade-in">{error}</p>}
-
-              <Button
-                className="w-full h-11"
-                onClick={handleLogin}
-                disabled={loading || !email || !password}
-              >
+              <Button className="w-full h-11" onClick={handleLogin} disabled={loading || !email || !password}>
                 {loading ? "Verifying…" : "Sign In →"}
               </Button>
             </div>
