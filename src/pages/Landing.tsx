@@ -38,7 +38,7 @@ const Landing = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-3xl w-full animate-fade-in"
         style={{ animationDelay: "0.2s" }}>
         
-        <Link to="/user-login" className="group relative overflow-hidden rounded-2xl p-7 border transition-all duration-300 hover:-translate-y-1"
+        {/* <Link to="/user-login" className="group relative overflow-hidden rounded-2xl p-7 border transition-all duration-300 hover:-translate-y-1"
           style={{
             background: "hsl(240 22% 10%)",
             borderColor: "hsl(240 18% 16%)",
@@ -53,9 +53,9 @@ const Landing = () => {
           </div>
           <h2 className="font-heading font-700 text-xl mb-2 text-foreground">Order Food</h2>
           <p className="text-muted-foreground text-sm">Browse menu & place orders</p>
-        </Link>
+        </Link> */}
 
-        <Link to="/login?role=admin" className="group relative overflow-hidden rounded-2xl p-7 border transition-all duration-300 hover:-translate-y-1"
+        <Link to="/login?role=admin"  className="group relative overflow-hidden rounded-2xl p-7 border transition-all duration-300 hover:-translate-y-1 flex flex-col items-center text-center md:col-start-2"
           style={{
             background: "hsl(240 22% 10%)",
             borderColor: "hsl(240 18% 16%)",
@@ -72,7 +72,7 @@ const Landing = () => {
           <p className="text-muted-foreground text-sm">Manage inventory & staff</p>
         </Link>
 
-        <Link to="/login?role=billing" className="group relative overflow-hidden rounded-2xl p-7 border transition-all duration-300 hover:-translate-y-1"
+        {/* <Link to="/login?role=billing" className="group relative overflow-hidden rounded-2xl p-7 border transition-all duration-300 hover:-translate-y-1"
           style={{
             background: "hsl(240 22% 10%)",
             borderColor: "hsl(240 18% 16%)",
@@ -87,7 +87,7 @@ const Landing = () => {
           </div>
           <h2 className="font-heading font-700 text-xl mb-2 text-foreground">Billing</h2>
           <p className="text-muted-foreground text-sm">Verify orders & print bills</p>
-        </Link>
+        </Link> */}
       </div>
 
       {/* Footer */}
