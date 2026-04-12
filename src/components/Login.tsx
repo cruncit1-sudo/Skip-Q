@@ -112,7 +112,7 @@ const Login = () => {
             ? "This account has Billing access only, not Admin."
             : firestoreRole === "ADMIN"
             ? "This account has Admin access only, not Billing."
-            : `Access denied. Required role: ${requiredRole}.`
+            : `Access denied`
         );
         setLoading(false);
         return;
