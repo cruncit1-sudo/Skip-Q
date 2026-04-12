@@ -5,8 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Landing from "./pages/Landing";
 import UserHome from "./pages/UserHome";
-import AdminDashboard from "./pages/AdminDashboard";
-import BillingPage from "./pages/BillingPage";
+// import AdminDashboard from "./pages/AdminDashboard";
+// import BillingPage from "./pages/BillingPage";
 import NotFound from "./pages/NotFound";
 import Login from "./components/Login";
 import UserPhoneLogin from "./pages/UserPhoneLogin";
@@ -24,8 +24,8 @@ const App = () => (
           <Route path="/user-login" element={<UserPhoneLogin />} />
           <Route path="/login" element={<Login />} />
           <Route path="/user" element={<UserHome />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/billing" element={<BillingPage />} />
+          {/* <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/billing" element={<BillingPage />} /> */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
