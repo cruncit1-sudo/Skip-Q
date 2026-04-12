@@ -751,8 +751,8 @@ const AdminDashboard = () => {
               <p className="text-sm text-muted-foreground mb-2">
                 You must create a shop before adding inventory. Only one shop can be created.
               </p>
-              <div><Label>Shop Name</Label><Input className="mt-1" value={shopForm.name} onChange={(e) => setShopForm({ ...shopForm, name: e.target.value })} placeholder="e.g. Campus Bites" /></div>
-              <div><Label>Shop Slogan (Optional)</Label><Input className="mt-1" value={shopForm.slogan} onChange={(e) => setShopForm({ ...shopForm, slogan: e.target.value })} placeholder="e.g. Best food on campus!" /></div>
+              <div><Label>Shop Name</Label><Input className="mt-1" value={shopForm.name} onChange={(e) => setShopForm({ ...shopForm, name: e.target.value })} placeholder="e.g. Cruncit Bites" /></div>
+              <div><Label>Shop Slogan (Optional)</Label><Input className="mt-1" value={shopForm.slogan} onChange={(e) => setShopForm({ ...shopForm, slogan: e.target.value })} placeholder="e.g. Best food on Cruncit!" /></div>
               <Button className="w-full" onClick={handleCreateShop} disabled={creatingShop}>
                 {creatingShop ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
                 Create Shop

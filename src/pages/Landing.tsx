@@ -26,7 +26,7 @@ const Landing = () => {
       {/* Hero text */}
       <div className="text-center mb-14 animate-fade-in" style={{ animationDelay: "0.1s" }}>
         <h1 className="text-6xl md:text-7xl font-heading font-800 mb-4 leading-tight">
-          Campus{" "}
+          Cruncit{" "}
           <span className="text-gradient">Bites</span>
         </h1>
         <p className="text-muted-foreground text-lg max-w-sm mx-auto leading-relaxed">
@@ -92,7 +92,7 @@ const Landing = () => {
 
       {/* Footer */}
       <p className="mt-12 text-muted-foreground text-xs animate-fade-in" style={{ animationDelay: "0.3s" }}>
-        Campus Bites · Canteen Management System
+        Cruncit Bites · Canteen Management System
       </p>
     </div>
   );

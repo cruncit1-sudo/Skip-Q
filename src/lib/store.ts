@@ -10,7 +10,7 @@ const generateOrderId = () => {
 
 const defaultCanteen: Canteen = {
   id: "1",
-  name: "Campus Bites",
+  name: "Cruncit Bites",
   slogan: "Fresh Food, Happy Mood 🍽️",
 };
 

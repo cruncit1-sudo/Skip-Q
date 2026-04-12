@@ -18,7 +18,7 @@ export default function UserPhoneLogin() {
       <div className="w-full max-w-md animate-fade-in relative z-10">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-heading font-800 text-foreground mb-1">
-            Campus <span className="text-gradient">Bites</span>
+            Cruncit <span className="text-gradient">Bites</span>
           </h1>
           <p className="text-muted-foreground text-sm">Verify your number to order food</p>
         </div>

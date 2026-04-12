@@ -138,7 +138,7 @@ const Login = () => {
       <div className="w-full max-w-md animate-fade-in relative z-10">
         <div className="text-center mb-10">
           <h1 className="text-4xl font-heading font-800 mb-1">
-            Campus <span className="text-gradient">Bites</span>
+            Cruncit <span className="text-gradient">Bites</span>
           </h1>
           <p className="text-muted-foreground text-sm">Sign in to continue</p>
         </div>
