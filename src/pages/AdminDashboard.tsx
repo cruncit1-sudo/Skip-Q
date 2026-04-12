@@ -82,7 +82,7 @@ function StaffSection() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"STAFF" | "BILLING">("STAFF");
+  const [role, setRole] = useState<"STAFF" | "Bill">("STAFF");
   const [showPw, setShowPw] = useState(false);
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState("");
@@ -94,7 +94,7 @@ function StaffSection() {
       const adminId = getAuth().currentUser?.uid;
       const snap = await getDocs(query(collection(db, "Staff"), orderBy("StaffNumber", "asc")));
       let fetched = snap.docs.map(d => ({ uid: d.id, ...d.data() } as FirestoreStaff));
-      fetched = fetched.filter(d => ["STAFF", "BILLING"].includes(d.Role) && d.CreatedBy === adminId);
+      fetched = fetched.filter(d => ["STAFF", "Bill"].includes(d.Role) && d.CreatedBy === adminId);
       setStaffList(fetched);
     } catch (e) { console.error(e); }
     finally { setLoadingList(false); }
@@ -160,8 +160,8 @@ function StaffSection() {
               className={`flex-1 py-2 rounded-lg border text-sm font-600 transition-colors ${role === "STAFF" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary"}`}>
               Staff
             </button>
-            <button onClick={() => setRole("BILLING")}
-              className={`flex-1 py-2 rounded-lg border text-sm font-600 transition-colors ${role === "BILLING" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary"}`}>
+            <button onClick={() => setRole("Bill")}
+              className={`flex-1 py-2 rounded-lg border text-sm font-600 transition-colors ${role === "Bill" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary"}`}>
               Billing
             </button>
           </div>
@@ -192,7 +192,7 @@ function StaffSection() {
               <Card key={s.uid} className="p-4 flex items-center justify-between">
                 <div>
                   <p className="font-600">{s.Name}</p>
-                  <p className="text-sm text-muted-foreground">{s.Email} · Staff #{s.StaffNumber} · <span className={`font-600 ${s.Role === "BILLING" ? "text-warning" : "text-accent"}`}>{s.Role}</span></p>
+                  <p className="text-sm text-muted-foreground">{s.Email} · Staff #{s.StaffNumber} · <span className={`font-600 ${s.Role === "Bill" ? "text-warning" : "text-accent"}`}>{s.Role}</span></p>
                 </div>
                 <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleDelete(s.uid, s.Name)}>
                   <Trash2 className="w-3 h-3" />

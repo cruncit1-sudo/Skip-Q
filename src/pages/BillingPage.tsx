@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, updateDoc, getDoc } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,13 +16,34 @@ const BillingPage = () => {
   const [loading, setLoading] = useState(false);
   const [serving, setServing] = useState(false);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [authorizedShopId, setAuthorizedShopId] = useState<string | null>(null);
 
   useEffect(() => {
     const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         navigate("/login?role=billing"); // Not logged in -> Redirect to Billing Login
       } else {
+        try {
+          let shopIdFound = null;
+          const staffSnap = await getDoc(doc(db, "Staff", user.uid));
+          
+          // If it's a staff, get their Admin's ID. If an Admin logs in directly, use their own UID.
+          const adminId = staffSnap.exists() ? staffSnap.data().CreatedBy : user.uid;
+          
+          if (adminId) {
+            const shopQ = query(collection(db, "Shop"), where("Createdby", "==", adminId));
+            const shopSnap = await getDocs(shopQ);
+            if (!shopSnap.empty) {
+              shopIdFound = shopSnap.docs[0].id;
+            } else {
+              shopIdFound = adminId; // Fallback to Admin ID
+            }
+          }
+          setAuthorizedShopId(shopIdFound);
+        } catch (e) {
+          console.error("Failed to fetch shop auth:", e);
+        }
         setIsAuthChecking(false);
       }
     });
@@ -44,9 +65,19 @@ const BillingPage = () => {
     setSearchedOrder(null);
     setNotFound(false);
 
+    if (!authorizedShopId) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+
     try {
       const snap = await getDocs(
-        query(collection(db, "Orders"), where("orderId", "==", trimmed))
+        query(
+          collection(db, "Orders"), 
+          where("orderId", "==", trimmed),
+          where("shopId", "==", authorizedShopId)
+        )
       );
       if (!snap.empty) {
         setSearchedOrder({ id: snap.docs[0].id, ...snap.docs[0].data() });
