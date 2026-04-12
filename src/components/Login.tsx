@@ -15,7 +15,7 @@ type Role = "admin" | "billing";
 const roleConfig: Record<Role, {
   label: string;
   icon: React.ReactNode;
-  color: string;
+  accentHsl: string;
   description: string;
   requiredFirestoreRole: string;
   destination: string;
@@ -23,7 +23,7 @@ const roleConfig: Record<Role, {
   admin: {
     label: "Admin Panel",
     icon: <ShieldCheck className="w-6 h-6" />,
-    color: "text-accent",
+    accentHsl: "160 65% 45%",
     description: "Manage inventory & staff",
     requiredFirestoreRole: "ADMIN",
     destination: "/admin",
@@ -31,7 +31,7 @@ const roleConfig: Record<Role, {
   billing: {
     label: "Billing Counter",
     icon: <Receipt className="w-6 h-6" />,
-    color: "text-warning",
+    accentHsl: "38 90% 52%",
     description: "Verify orders & print bills",
     requiredFirestoreRole: "Bill",
     destination: "/billing",
@@ -69,33 +69,23 @@ const Login = () => {
     setLoading(true);
 
     try {
-      // Step 1: Firebase Auth login
       const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
       const uid = credential.user.uid;
 
       const requiredRole = roleConfig[selectedRole].requiredFirestoreRole;
       let firestoreRole: string | null = null;
 
-      // Check Admin collection by uid
       const adminDoc = await getDoc(doc(db, "Admin", uid));
-      if (adminDoc.exists()) {
-        firestoreRole = adminDoc.data()?.Role;
-      }
+      if (adminDoc.exists()) firestoreRole = adminDoc.data()?.Role;
 
-      // Check Bill collection by uid
       if (!firestoreRole) {
         const billDoc = await getDoc(doc(db, "Bill", uid));
-        if (billDoc.exists()) {
-          firestoreRole = billDoc.data()?.Role;
-        }
+        if (billDoc.exists()) firestoreRole = billDoc.data()?.Role;
       }
 
-      // Check Staff collection by uid
       if (!firestoreRole) {
         const staffDoc = await getDoc(doc(db, "Staff", uid));
-        if (staffDoc.exists()) {
-          firestoreRole = staffDoc.data()?.Role;
-        }
+        if (staffDoc.exists()) firestoreRole = staffDoc.data()?.Role;
       }
 
       if (!firestoreRole) {
@@ -112,13 +102,12 @@ const Login = () => {
             ? "This account has Billing access only, not Admin."
             : firestoreRole === "ADMIN"
             ? "This account has Admin access only, not Billing."
-            : `Access denied`
+            : "Access denied"
         );
         setLoading(false);
         return;
       }
 
-      // Role matched — navigate
       navigate(roleConfig[selectedRole].destination);
     } catch (err: any) {
       setError(getFirebaseError(err.code));
@@ -137,15 +126,19 @@ const Login = () => {
   const config = selectedRole ? roleConfig[selectedRole] : null;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      {/* Background glow */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full opacity-10 blur-3xl pointer-events-none"
+        style={{ background: "hsl(258 85% 62%)" }} />
+
       <Link to="/" className="absolute top-6 left-6 text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="w-5 h-5" />
       </Link>
 
-      <div className="w-full max-w-md animate-fade-in">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-heading font-800 text-foreground mb-1">
-            Campus <span className="text-primary">Bites</span>
+      <div className="w-full max-w-md animate-fade-in relative z-10">
+        <div className="text-center mb-10">
+          <h1 className="text-4xl font-heading font-800 mb-1">
+            Campus <span className="text-gradient">Bites</span>
           </h1>
           <p className="text-muted-foreground text-sm">Sign in to continue</p>
         </div>
@@ -156,18 +149,26 @@ const Login = () => {
             {(Object.keys(roleConfig) as Role[]).map((role) => {
               const cfg = roleConfig[role];
               return (
-                <button
-                  key={role}
-                  onClick={() => setSelectedRole(role)}
-                  className="w-full group bg-card rounded-2xl p-5 border border-border hover:border-primary hover:shadow-md transition-all duration-200 flex items-center gap-4 text-left"
-                >
-                  <div className={`w-12 h-12 rounded-xl bg-secondary flex items-center justify-center ${cfg.color} group-hover:bg-primary group-hover:text-primary-foreground transition-colors`}>
+                <button key={role} onClick={() => setSelectedRole(role)}
+                  className="w-full group rounded-2xl p-5 border transition-all duration-200 flex items-center gap-4 text-left hover:-translate-y-0.5"
+                  style={{
+                    background: "hsl(240 22% 10%)",
+                    borderColor: "hsl(240 18% 16%)",
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = `hsl(${cfg.accentHsl} / 0.4)`)}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = "hsl(240 18% 16%)")}>
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors"
+                    style={{
+                      background: `hsl(${cfg.accentHsl} / 0.15)`,
+                      color: `hsl(${cfg.accentHsl})`,
+                    }}>
                     {cfg.icon}
                   </div>
                   <div>
-                    <p className="font-heading font-700 text-card-foreground">{cfg.label}</p>
+                    <p className="font-heading font-700 text-foreground">{cfg.label}</p>
                     <p className="text-sm text-muted-foreground">{cfg.description}</p>
                   </div>
+                  <ArrowLeft className="w-4 h-4 ml-auto rotate-180 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
               );
             })}
@@ -175,48 +176,69 @@ const Login = () => {
         )}
 
         {selectedRole && config && (
-          <Card className="p-6 space-y-5">
-            <div className="flex items-center gap-3 pb-3 border-b border-border">
-              <div className={`w-10 h-10 rounded-xl bg-secondary flex items-center justify-center ${config.color}`}>
+          <div className="rounded-2xl border p-6 space-y-5"
+            style={{ background: "hsl(240 22% 10%)", borderColor: "hsl(240 18% 16%)" }}>
+            <div className="flex items-center gap-3 pb-4 border-b" style={{ borderColor: "hsl(240 18% 16%)" }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{
+                  background: `hsl(${config.accentHsl} / 0.15)`,
+                  color: `hsl(${config.accentHsl})`,
+                }}>
                 {config.icon}
               </div>
               <div>
-                <p className="font-heading font-700">{config.label}</p>
+                <p className="font-heading font-700 text-foreground">{config.label}</p>
                 <p className="text-xs text-muted-foreground">{config.description}</p>
               </div>
-              <button onClick={handleRoleChange} className="ml-auto text-xs text-muted-foreground hover:text-foreground underline">
+              <button onClick={handleRoleChange}
+                className="ml-auto text-xs text-muted-foreground hover:text-foreground underline transition-colors">
                 Change
               </button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-foreground/80 text-sm">Email</Label>
                 <Input id="email" type="email" placeholder="you@example.com"
                   value={email} onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                  className="mt-1" autoFocus />
+                  className="mt-1.5 bg-background border-border text-foreground placeholder:text-muted-foreground"
+                  autoFocus />
               </div>
               <div>
-                <Label htmlFor="password">Password</Label>
-                <div className="relative mt-1">
+                <Label htmlFor="password" className="text-foreground/80 text-sm">Password</Label>
+                <div className="relative mt-1.5">
                   <Input id="password" type={showPassword ? "text" : "password"}
                     placeholder="Enter your password" value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                    className="pr-10" />
+                    className="pr-10 bg-background border-border text-foreground placeholder:text-muted-foreground" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
-              {error && <p className="text-destructive text-sm animate-fade-in">{error}</p>}
-              <Button className="w-full h-11" onClick={handleLogin} disabled={loading || !email || !password}>
+
+              {error && (
+                <div className="rounded-lg px-3 py-2 text-sm animate-fade-in"
+                  style={{ background: "hsl(0 70% 55% / 0.1)", color: "hsl(0 70% 70%)", border: "1px solid hsl(0 70% 55% / 0.2)" }}>
+                  {error}
+                </div>
+              )}
+
+              <button
+                onClick={handleLogin}
+                disabled={loading || !email || !password}
+                className="w-full h-11 rounded-xl font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  background: "hsl(258 85% 62%)",
+                  color: "white",
+                }}>
                 {loading ? "Verifying…" : "Sign In →"}
-              </Button>
+              </button>
             </div>
-          </Card>
+          </div>
         )}
       </div>
     </div>
