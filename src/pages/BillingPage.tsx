@@ -142,9 +142,9 @@ const BillingPage = () => {
             {/* Receipt — monochrome for printing */}
             <div className="p-6 max-w-sm mx-auto font-mono text-sm bg-white text-black shadow-lg border border-gray-300 print:shadow-none print:border-none print:max-w-full print:p-0">
               <div className="text-center space-y-1 mb-4">
-                <div>================================================</div>
+                <div>=============================================</div>
                 <p className="font-bold text-lg uppercase tracking-wider">{searchedOrder.shopName || "COLLEGE CANTEEN"}</p>
-                <div>================================================</div>
+                <div>=============================================</div>
               </div>
               <div className="flex justify-between mb-2">
                 <span>Date: {getFormattedDate(searchedOrder.createdAt)}</span>
@@ -153,33 +153,33 @@ const BillingPage = () => {
               <div className="text-center mb-4">
                 Order ID: <span className="font-bold">{searchedOrder.orderId}</span>
               </div>
-              <div className="mb-2">------------------------------------------------</div>
+              <div className="mb-2">---------------------------------------------</div>
               <div className="flex justify-between font-bold mb-2">
                 <span className="w-1/2 text-left">Item Name</span>
                 <span className="w-1/4 text-center">Qty</span>
                 <span className="w-1/4 text-right">Price</span>
               </div>
-              <div className="mb-2">------------------------------------------------</div>
+              <div className="mb-2">---------------------------------------------</div>
               <div className="space-y-2 mb-2">
                 {searchedOrder.items.map((item: any, i: number) => (
                   <div key={i} className="flex justify-between">
                     <span className="w-1/2 text-left pr-2">{item.name}</span>
                     <span className="w-1/4 text-center">{item.cartQuantity}</span>
-                    <span className="w-1/4 text-right">₹{(item.price * item.cartQuantity).toFixed(2)}</span>
+                    <span className="w-1/4 text-right">Rs.{(item.price * item.cartQuantity).toFixed(2)}</span>
                   </div>
                 ))}
               </div>
-              <div className="mt-2 mb-4">------------------------------------------------</div>
+              <div className="mt-2 mb-4">---------------------------------------------</div>
               <div className="space-y-1 mb-6">
                 {searchedOrder.discount > 0 && (
                   <div className="flex justify-between pl-8">
                     <span>Discount:</span>
-                    <span>-₹{searchedOrder.discount.toFixed(2)}</span>
+                    <span>-Rs.{searchedOrder.discount.toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between pl-8 font-bold text-base">
                   <span>TOTAL:</span>
-                  <span>₹{searchedOrder.total.toFixed(2)}</span>
+                  <span>Rs.{searchedOrder.total.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between pl-8">
                   <span>Payment:</span>
@@ -187,9 +187,9 @@ const BillingPage = () => {
                 </div>
               </div>
               <div className="text-center space-y-1">
-                <div>================================================</div>
+                <div>=============================================</div>
                 <p>Thank you! Visit again :)</p>
-                <div>================================================</div>
+                <div>=============================================</div>
               </div>
             </div>
 
@@ -202,7 +202,7 @@ const BillingPage = () => {
                     color: "hsl(38 90% 65%)",
                     border: "1px solid hsl(38 90% 52% / 0.25)"
                   }}>
-                  ⚠️ Collect ₹{searchedOrder.total} cash from customer!
+                  ⚠️ Collect Rs.{searchedOrder.total} cash from customer!
                 </div>
               )}
               {!isServed ? (

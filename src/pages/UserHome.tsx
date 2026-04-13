@@ -360,7 +360,7 @@ const UserHome = () => {
             });
 
             setPaymentError(
-              `Your payment of ₹${finalTotal} has been refunded ` +
+              `Your payment of Rs.${finalTotal} has been refunded ` +
               `(Refund ID: ${result.data.refundId}). ` +
               `It will reflect in 5–7 business days. Sorry for the inconvenience.`
             );
@@ -369,7 +369,7 @@ const UserHome = () => {
             setPaymentError(
               `Payment received but order failed. We couldn't auto-refund. ` +
               `Please contact support with Payment ID: ${response.razorpay_payment_id} ` +
-              `and we'll refund ₹${finalTotal} manually.`
+              `and we'll refund Rs.${finalTotal} manually.`
             );
           }
         } finally {
@@ -406,7 +406,7 @@ const UserHome = () => {
   const PaymentModal = () => (
     <div className="fixed inset-0 bg-foreground/50 flex items-center justify-center p-6 z-50">
       <Card className="p-8 max-w-sm w-full text-center animate-fade-in">
-        <h3 className="font-heading font-700 text-xl mb-2">Total: ₹{getDiscountAndTotal().finalTotal}</h3>
+        <h3 className="font-heading font-700 text-xl mb-2">Total: Rs.{getDiscountAndTotal().finalTotal}</h3>
         <p className="text-muted-foreground mb-6">Choose your payment method</p>
         <div className="space-y-3">
           <Button
@@ -509,7 +509,7 @@ const UserHome = () => {
                   {order.items.map((item, i) => (
                     <div key={i} className="flex justify-between text-sm text-muted-foreground">
                       <span>{item.name} × {item.cartQuantity}</span>
-                      <span>₹{item.price * item.cartQuantity}</span>
+                      <span>Rs.{item.price * item.cartQuantity}</span>
                     </div>
                   ))}
                 </div>
@@ -517,12 +517,12 @@ const UserHome = () => {
                 {order.discount ? (
                   <div className="flex justify-between text-xs text-accent mt-1 mb-2">
                     <span>Discount applied</span>
-                    <span>-₹{order.discount}</span>
+                    <span>-Rs.{order.discount}</span>
                   </div>
                 ) : null}
                 <div className="flex justify-between items-center border-t border-border pt-2">
                   <span className="text-sm font-600">Total</span>
-                  <span className="font-heading font-700 text-primary">₹{order.total}</span>
+                  <span className="font-heading font-700 text-primary">Rs.{order.total}</span>
                 </div>
               </Card>
             ))
@@ -583,7 +583,7 @@ const UserHome = () => {
                   <div>
                     <p className="font-600">{foodTypeEmojis[item.type as FoodType]} {item.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      ₹{item.price} × {item.cartQuantity} = ₹{item.price * item.cartQuantity}
+                      Rs.{item.price} × {item.cartQuantity} = Rs.{item.price * item.cartQuantity}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -614,11 +614,11 @@ const UserHome = () => {
                       <div>
                         <p className="font-heading font-700 text-primary">{selectedShop.offer.title}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Save {selectedShop.offer.percentage}% on orders above ₹{selectedShop.offer.minAmount}
+                          Save {selectedShop.offer.percentage}% on orders above Rs.{selectedShop.offer.minAmount}
                         </p>
                         {isEligible && applyOffer && potentialDiscount > 0 && (
                           <p className="text-xs font-600 text-accent mt-1">
-                            Yay! You saved ₹{potentialDiscount}
+                            Yay! You saved Rs.{potentialDiscount}
                           </p>
                         )}
                       </div>
@@ -635,7 +635,7 @@ const UserHome = () => {
                         </Button>
                       ) : (
                         <p className="text-xs font-600 text-muted-foreground text-right w-20">
-                          Add ₹{selectedShop.offer.minAmount - subtotal} more
+                          Add Rs.{selectedShop.offer.minAmount - subtotal} more
                         </p>
                       )}
                     </div>
@@ -646,12 +646,12 @@ const UserHome = () => {
               <Card className="p-4 bg-secondary">
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-sm">
-                    <span>Subtotal</span><span className="font-600">₹{subtotal}</span>
+                    <span>Subtotal</span><span className="font-600">Rs.{subtotal}</span>
                   </div>
-                  {discount > 0 && <div className="flex justify-between items-center text-sm text-accent"><span>Discount ({selectedShop.offer.percentage}%)</span><span className="font-600">-₹{discount}</span></div>}
+                  {discount > 0 && <div className="flex justify-between items-center text-sm text-accent"><span>Discount ({selectedShop.offer.percentage}%)</span><span className="font-600">-Rs.{discount}</span></div>}
                   <div className="flex justify-between items-center border-t border-border/50 pt-2">
                     <span className="font-heading font-600">Total</span>
-                    <span className="text-2xl font-heading font-800 text-primary">₹{finalTotal}</span>
+                    <span className="text-2xl font-heading font-800 text-primary">Rs.{finalTotal}</span>
                   </div>
                 </div>
               </Card>
@@ -691,7 +691,7 @@ const UserHome = () => {
             </Button>
             {cart.length > 0 && (
               <Button size="sm" onClick={() => { setPaymentError(""); setShowPayment(true); }}>
-                Pay ₹{getDiscountAndTotal().finalTotal}
+                Pay Rs.{getDiscountAndTotal().finalTotal}
               </Button>
             )}
           </div>
@@ -727,7 +727,7 @@ const UserHome = () => {
                 <Card key={item.id} className="p-4 flex items-center justify-between animate-fade-in">
                   <div>
                     <p className="font-600 text-card-foreground">{item.name}</p>
-                    <p className="text-primary font-heading font-700">₹{item.price}</p>
+                    <p className="text-primary font-heading font-700">Rs.{item.price}</p>
                     {item.countable && item.quantity !== undefined && (
                       <p className="text-xs text-muted-foreground">Stock: {item.quantity}</p>
                     )}
@@ -823,7 +823,7 @@ const UserHome = () => {
                         <Gift className="w-4 h-4" /> {shop.offer.title}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {shop.offer.percentage}% OFF on orders above ₹{shop.offer.minAmount}
+                        {shop.offer.percentage}% OFF on orders above Rs.{shop.offer.minAmount}
                       </p>
                     </div>
                   )}

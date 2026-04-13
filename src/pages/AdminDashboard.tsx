@@ -276,7 +276,7 @@ function OrdersSection({ shop }: { shop: any }) {
                   {order.items.length} item{order.items.length > 1 ? "s" : ""} · {formatTime(order.createdAt)}
                 </p>
               </div>
-              <p className="font-heading font-700 text-primary text-lg">₹{order.total}</p>
+              <p className="font-heading font-700 text-primary text-lg">Rs.{order.total}</p>
             </Card>
           ))}
         </div>
@@ -306,7 +306,7 @@ function OrdersSection({ shop }: { shop: any }) {
                 {selected.items.map((item, i) => (
                   <div key={i} className="flex justify-between text-sm bg-secondary rounded-lg px-3 py-2">
                     <span>{item.name} × {item.cartQuantity}</span>
-                    <span className="font-600">₹{item.price * item.cartQuantity}</span>
+                    <span className="font-600">Rs.{item.price * item.cartQuantity}</span>
                   </div>
                 ))}
               </div>
@@ -314,13 +314,13 @@ function OrdersSection({ shop }: { shop: any }) {
               {selected.discount ? (
                 <div className="flex justify-between text-sm text-accent">
                   <span>Discount</span>
-                  <span>-₹{selected.discount}</span>
+                  <span>-Rs.{selected.discount}</span>
                 </div>
               ) : null}
 
               <div className="flex justify-between items-center border-t border-border pt-3">
                 <span className="font-heading font-700">Total</span>
-                <span className="font-heading font-800 text-primary text-xl">₹{selected.total}</span>
+                <span className="font-heading font-800 text-primary text-xl">Rs.{selected.total}</span>
               </div>
             </div>
           )}
@@ -406,7 +406,7 @@ function DashboardSection({ menuItemsCount, shop, onToggleShop }: { menuItemsCou
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <Card className="p-6 border-l-4 border-l-primary">
               <p className="text-muted-foreground text-sm font-600">Total Revenue</p>
-              <p className="text-3xl font-heading font-800 text-foreground mt-2">₹{totalRevenue}</p>
+              <p className="text-3xl font-heading font-800 text-foreground mt-2">Rs.{totalRevenue}</p>
             </Card>
             <Card className="p-6 border-l-4 border-l-accent">
               <p className="text-muted-foreground text-sm font-600">Total Orders</p>
@@ -430,8 +430,8 @@ function DashboardSection({ menuItemsCount, shop, onToggleShop }: { menuItemsCou
                   <BarChart data={last7DaysData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                     <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} tickFormatter={(val) => `₹${val}`} />
-                    <Tooltip cursor={{ fill: "hsl(var(--muted))" }} formatter={(val) => [`₹${val}`, "Revenue"]} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} tickFormatter={(val) => `Rs.${val}`} />
+                    <Tooltip cursor={{ fill: "hsl(var(--muted))" }} formatter={(val) => [`Rs.${val}`, "Revenue"]} />
                     <Bar dataKey="amount" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -449,14 +449,14 @@ function DashboardSection({ menuItemsCount, shop, onToggleShop }: { menuItemsCou
                           <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value) => `₹${value}`} />
+                      <Tooltip formatter={(value) => `Rs.${value}`} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="flex justify-center gap-6 mt-4">
                     {pieData.map((entry, index) => (
                       <div key={entry.name} className="flex items-center gap-2 text-sm font-500">
                         <span className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}></span>
-                        {entry.name}: ₹{entry.value}
+                        {entry.name}: Rs.{entry.value}
                       </div>
                     ))}
                   </div>
@@ -519,7 +519,7 @@ function OffersSection({ shop, setShop, menuItems }: { shop: any, setShop: any, 
               <p className="font-heading font-700 text-primary flex items-center gap-2">
                 <Gift className="w-5 h-5" /> {shop.offer.title}
               </p>
-              <p className="text-sm font-600 mt-1">{shop.offer.percentage}% OFF <span className="text-muted-foreground font-400">on orders above ₹{shop.offer.minAmount}</span></p>
+              <p className="text-sm font-600 mt-1">{shop.offer.percentage}% OFF <span className="text-muted-foreground font-400">on orders above Rs.{shop.offer.minAmount}</span></p>
               <p className="text-xs text-muted-foreground mt-1">Valid on: {shop.offer.validUntil}</p>
             </div>
             <div className="flex gap-2 w-full sm:w-auto">
@@ -541,7 +541,7 @@ function OffersSection({ shop, setShop, menuItems }: { shop: any, setShop: any, 
         <div><Label>Offer Title</Label><Input className="mt-1" value={offer.title} onChange={(e) => setOffer({...offer, title: e.target.value})} placeholder="e.g. Diwali Special 20% OFF" /></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><Label>Discount Percentage (%)</Label><Input className="mt-1" type="number" value={offer.percentage || ""} onChange={(e) => setOffer({...offer, percentage: Number(e.target.value)})} placeholder="e.g. 20" /></div>
-          <div><Label>Minimum Cart Amount (₹)</Label><Input className="mt-1" type="number" value={offer.minAmount || ""} onChange={(e) => setOffer({...offer, minAmount: Number(e.target.value)})} placeholder="e.g. 250" /></div>
+          <div><Label>Minimum Cart Amount (Rs.)</Label><Input className="mt-1" type="number" value={offer.minAmount || ""} onChange={(e) => setOffer({...offer, minAmount: Number(e.target.value)})} placeholder="e.g. 250" /></div>
         </div>
         <div><Label>Offer Date (Valid On)</Label><Input className="mt-1" type="date" value={offer.validUntil} onChange={(e) => setOffer({...offer, validUntil: e.target.value})} /></div>
         <div>
@@ -769,7 +769,7 @@ const AdminDashboard = () => {
           </div>
           <Card className="p-6 space-y-5">
             <div><Label>Food Name</Label><Input className="mt-1" value={newItem.name} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} placeholder="e.g. Chicken Biryani" /></div>
-          <div><Label>Amount (₹)</Label><Input className="mt-1" type="number" value={newItem.price || ""} onChange={(e) => setNewItem({ ...newItem, price: Number(e.target.value) })} placeholder="0" /></div>
+          <div><Label>Amount (Rs.)</Label><Input className="mt-1" type="number" value={newItem.price || ""} onChange={(e) => setNewItem({ ...newItem, price: Number(e.target.value) })} placeholder="0" /></div>
           <div>
             <Label>Type</Label>
             <Select value={newItem.type} onValueChange={(v: any) => setNewItem({ ...newItem, type: v })}>
@@ -827,7 +827,7 @@ const AdminDashboard = () => {
                 <div>
                   <p className="font-600">{typeEmoji[item.type]} {item.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    ₹{item.price} · {item.type}
+                    Rs.{item.price} · {item.type}
                     {item.countable ? ` · Qty: ${item.quantity}` : " · Uncountable"}
                   </p>
                 </div>
@@ -848,7 +848,7 @@ const AdminDashboard = () => {
                       <DialogHeader><DialogTitle>Edit {item.name}</DialogTitle></DialogHeader>
                       <div className="space-y-4">
                         <div><Label>Name</Label><Input className="mt-1" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
-                        <div><Label>Price (₹)</Label><Input className="mt-1" type="number" value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: Number(e.target.value) })} /></div>
+                        <div><Label>Price (Rs.)</Label><Input className="mt-1" type="number" value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: Number(e.target.value) })} /></div>
                         <div>
                           <Label>Countable or Uncountable?</Label>
                           <div className="flex gap-3 mt-2">
