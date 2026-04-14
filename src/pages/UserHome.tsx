@@ -4,6 +4,7 @@ import { db } from "@/lib/firebase";
 import {
   collection, getDocs, query, where,
   addDoc, doc, updateDoc, increment,
+  runTransaction,
 } from "firebase/firestore";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
@@ -81,12 +82,38 @@ const foodTypeEmojis: Record<FoodType, string> = {
   drink: "🥤",
 };
 
-const generateOrderId = () => {
-  const chars = "0123456789";
-  let result = "";
-  for (let i = 0; i < 4; i++)
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  return result;
+const getNextOrderId = async (shopId: string) => {
+  const shopRef = doc(db, "Shop", shopId);
+  
+  const nextNum = await runTransaction(db, async (transaction) => {
+    const shopDoc = await transaction.get(shopRef);
+    const currentCount = shopDoc.data()?.orderCount;
+    let nextCount = 0;
+    if (currentCount === undefined) {
+      nextCount = 0;
+    } else {
+      nextCount = currentCount + 1;
+      if (nextCount > 9999) {
+        nextCount = 0;
+      }
+    }
+    transaction.update(shopRef, { orderCount: nextCount });
+    return nextCount;
+  });
+
+  const newOrderId = String(nextNum).padStart(4, "0");
+
+  // Once we reuse an ID, delete it from any old orders to avoid duplicates/search overlap.
+  try {
+    const q = query(collection(db, "Orders"), where("shopId", "==", shopId), where("orderId", "==", newOrderId));
+    const snap = await getDocs(q);
+    const updatePromises = snap.docs.map((d) => updateDoc(doc(db, "Orders", d.id), { orderId: "" }));
+    await Promise.all(updatePromises);
+  } catch (err) {
+    console.error("Failed to clear old order IDs", err);
+  }
+
+  return newOrderId;
 };
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -291,7 +318,7 @@ const UserHome = () => {
     setPaymentError("");
     setPlacingOrder(true);
     try {
-      const orderId = generateOrderId();
+      const orderId = await getNextOrderId(selectedShopId!);
       await saveOrder(orderId, "cash");
       setOrderComplete({ orderId, method: "cash" });
       setShowPayment(false);
@@ -316,84 +343,90 @@ const UserHome = () => {
       return;
     }
 
-    const orderId = generateOrderId();
-    const { finalTotal } = getDiscountAndTotal();
+    try {
+      const orderId = await getNextOrderId(selectedShopId!);
+      const { finalTotal } = getDiscountAndTotal();
 
-    const options = {
-      key: RAZORPAY_KEY,
-      amount: finalTotal * 100,          // Razorpay expects paise
-      currency: "INR",
-      name: selectedShop?.name || canteen.name,
-      description: `Order ${orderId}`,
-      // image: "/logo.png",         // optional: add your logo URL
-      prefill: {
-        contact: localUser?.phoneNumber ?? "",
-      },
-      notes: {
-        orderId,
-      },
-      theme: {
-        color: "hsl(24, 95%, 53%)",  // matches your --primary
-      },
-      handler: async (response: any) => {
-        // Payment successful — response.razorpay_payment_id is available
-        try {
-          await saveOrder(orderId, "online", response.razorpay_payment_id);
-          setOrderComplete({ orderId, method: "online" });
-          setShowPayment(false);
-          setShowCart(false);
-        } catch (e) {
-          console.error("Order save failed after payment:", e);
-
-          // ── AUTO REFUND ────────────────────────────────────────────────
-          setPaymentError(
-            "Payment received but order failed. Initiating refund automatically..."
-          );
-
-          try {
-            const functions = getFunctions();
-            const refundFn = httpsCallable(functions, "refundFailedOrder");
-
-            const result: any = await refundFn({
-              razorpayPaymentId: response.razorpay_payment_id,
-              amount: finalTotal,
-            });
-
-            setPaymentError(
-              `Your payment of ₹${finalTotal} has been refunded ` +
-              `(Refund ID: ${result.data.refundId}). ` +
-              `It will reflect in 5–7 business days. Sorry for the inconvenience.`
-            );
-          } catch (refundErr) {
-            console.error("Refund also failed:", refundErr);
-            setPaymentError(
-              `Payment received but order failed. We couldn't auto-refund. ` +
-              `Please contact support with Payment ID: ${response.razorpay_payment_id} ` +
-              `and we'll refund ₹${finalTotal} manually.`
-            );
-          }
-        } finally {
-          setPlacingOrder(false);
-        }
-      },
-      modal: {
-        ondismiss: () => {
-          // User closed the Razorpay modal without paying
-          setPlacingOrder(false);
-          setPaymentError("Payment cancelled. Try again.");
+      const options = {
+        key: RAZORPAY_KEY,
+        amount: finalTotal * 100,          // Razorpay expects paise
+        currency: "INR",
+        name: selectedShop?.name || canteen.name,
+        description: `Order ${orderId}`,
+        // image: "/logo.png",         // optional: add your logo URL
+        prefill: {
+          contact: localUser?.phoneNumber ?? "",
         },
-      },
-    };
+        notes: {
+          orderId,
+        },
+        theme: {
+          color: "hsl(24, 95%, 53%)",  // matches your --primary
+        },
+        handler: async (response: any) => {
+          // Payment successful — response.razorpay_payment_id is available
+          try {
+            await saveOrder(orderId, "online", response.razorpay_payment_id);
+            setOrderComplete({ orderId, method: "online" });
+            setShowPayment(false);
+            setShowCart(false);
+          } catch (e) {
+            console.error("Order save failed after payment:", e);
 
-    const rzp = new window.Razorpay(options);
+            // ── AUTO REFUND ────────────────────────────────────────────────
+            setPaymentError(
+              "Payment received but order failed. Initiating refund automatically..."
+            );
 
-    rzp.on("payment.failed", (response: any) => {
-      console.error("Razorpay payment failed:", response.error);
-      setPaymentError(`Payment failed: ${response.error.description}`);
+            try {
+              const functions = getFunctions();
+              const refundFn = httpsCallable(functions, "refundFailedOrder");
+
+              const result: any = await refundFn({
+                razorpayPaymentId: response.razorpay_payment_id,
+                amount: finalTotal,
+              });
+
+              setPaymentError(
+                `Your payment of ₹${finalTotal} has been refunded ` +
+                `(Refund ID: ${result.data.refundId}). ` +
+                `It will reflect in 5-7 business days. Sorry for the inconvenience.`
+              );
+            } catch (refundErr) {
+              console.error("Refund also failed:", refundErr);
+              setPaymentError(
+                `Payment received but order failed. We couldn't auto-refund. ` +
+                `Please contact support with Payment ID: ${response.razorpay_payment_id} ` +
+                `and we'll refund ₹${finalTotal} manually.`
+              );
+            }
+          } finally {
+            setPlacingOrder(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            // User closed the Razorpay modal without paying
+            setPlacingOrder(false);
+            setPaymentError("Payment cancelled. Try again.");
+          },
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+
+      rzp.on("payment.failed", (response: any) => {
+        console.error("Razorpay payment failed:", response.error);
+        setPaymentError(`Payment failed: ${response.error.description}`);
+        setPlacingOrder(false);
+      });
+
+      rzp.open();
+    } catch (e) {
+      console.error(e);
+      setPaymentError("Failed to initialize order. Please try again.");
       setPlacingOrder(false);
-    });
-
-    rzp.open();
+    }
   };
 
   const formatTime = (ts: any) => {
