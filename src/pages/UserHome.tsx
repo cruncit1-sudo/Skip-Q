@@ -1,3 +1,4 @@
+// UserHome.tsx - Complete Redesign
 import { useState, useEffect } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { db } from "@/lib/firebase";
@@ -8,15 +9,21 @@ import {
 } from "firebase/firestore";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   ArrowLeft, ShoppingCart, Plus, Minus, Trash2,
-  Loader2, History, CheckCircle2, Clock, Gift
+  Loader2, Clock, Gift, ChevronRight, 
+  Home, Search, FileText, User, MapPin, 
+  CreditCard, CheckCircle2, X, Sparkles, Flame
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 
-// ── Razorpay type declaration ──────────────────────────────────────────────
 declare global {
   interface Window {
     Razorpay: any;
@@ -25,7 +32,6 @@ declare global {
 
 const RAZORPAY_KEY = "rzp_live_ScZx0esi774zi7";
 
-// Dynamically load Razorpay SDK once
 const loadRazorpay = (): Promise<boolean> =>
   new Promise((resolve) => {
     if (window.Razorpay) return resolve(true);
@@ -36,7 +42,6 @@ const loadRazorpay = (): Promise<boolean> =>
     document.body.appendChild(script);
   });
 
-// ── Types ──────────────────────────────────────────────────────────────────
 type FoodType = "food" | "snack" | "drink";
 
 interface InventoryItem {
@@ -47,6 +52,8 @@ interface InventoryItem {
   countable: boolean;
   quantity?: number;
   available: boolean;
+  description?: string;
+  image?: string;
 }
 
 interface OrderItem {
@@ -64,22 +71,16 @@ interface FirestoreOrder {
   paymentMethod: "online" | "cash";
   paymentStatus: string;
   served?: boolean;
-  shopName?: string; 
+  shopName?: string;
+  shopAddress?: string;
   subtotal?: number;
   discount?: number;
   createdAt: any;
 }
 
-const foodTypeLabels: Record<FoodType, string> = {
-  food: "🍛 Food",
-  snack: "🍿 Snacks",
-  drink: "🥤 Drinks",
-};
-
-const foodTypeEmojis: Record<FoodType, string> = {
-  food: "🍛",
-  snack: "🍿",
-  drink: "🥤",
+const getTodayString = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
 const getNextOrderId = async (shopId: string) => {
@@ -93,22 +94,18 @@ const getNextOrderId = async (shopId: string) => {
       nextCount = 0;
     } else {
       nextCount = currentCount + 1;
-      if (nextCount > 9999) {
-        nextCount = 0;
-      }
+      if (nextCount > 9999) nextCount = 0;
     }
     transaction.update(shopRef, { orderCount: nextCount });
     return nextCount;
   });
 
   const newOrderId = String(nextNum).padStart(4, "0");
-
-  // Once we reuse an ID, delete it from any old orders to avoid duplicates/search overlap.
+  
   try {
     const q = query(collection(db, "Orders"), where("shopId", "==", shopId), where("orderId", "==", newOrderId));
     const snap = await getDocs(q);
-    const updatePromises = snap.docs.map((d) => updateDoc(doc(db, "Orders", d.id), { orderId: "" }));
-    await Promise.all(updatePromises);
+    await Promise.all(snap.docs.map((d) => updateDoc(doc(db, "Orders", d.id), { orderId: "" })));
   } catch (err) {
     console.error("Failed to clear old order IDs", err);
   }
@@ -116,143 +113,204 @@ const getNextOrderId = async (shopId: string) => {
   return newOrderId;
 };
 
-// ── Component ──────────────────────────────────────────────────────────────
-const UserHome = () => {
-  const navigate = useNavigate();
-  const {
-    canteen, cart, addToCart, removeFromCart,
-    updateCartQuantity, getCartTotal, clearCart, currentUser,
-  } = useStore();
+// ========== HOME SCREEN ==========
+// ========== HOME SCREEN (Updated) ==========
+const HomeScreen = ({ 
+  shops, loadingShops, onShopSelect, onViewHistory 
+}: { 
+  shops: any[], loadingShops: boolean, 
+  onShopSelect: (shop: any) => void,
+  onViewHistory: () => void 
+}) => {
+  const { currentUser } = useStore();
+  const greeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  };
 
-  // Local User State for Persistence across page refresh
-  const [localUser, setLocalUser] = useState<any>(() => {
-    if (currentUser) {
-      localStorage.setItem("skipq_user", JSON.stringify(currentUser));
-      return currentUser;
-    }
-    const stored = localStorage.getItem("skipq_user");
-    return stored ? JSON.parse(stored) : null;
-  });
+  // Get the display name (show phone number if no name)
+  const displayName = currentUser?.phoneNumber?.replace("+91", "") || "Guest";
+
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      {/* Header */}
+      <div className="bg-gradient-to-br from-primary/20 via-primary/5 to-transparent pt-6 pb-4 px-5">
+        <div className="flex justify-between items-start">
+          <div>
+            <p className="text-sm text-muted-foreground">{greeting()},</p>
+            <h1 className="text-2xl font-heading font-800 text-foreground">
+              {displayName}
+            </h1>
+          </div>
+          <button 
+            onClick={onViewHistory}
+            className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center"
+          >
+            <FileText className="w-5 h-5 text-muted-foreground" />
+          </button>
+        </div>
+      </div>
+
+      {/* Section Header */}
+      <div className="px-5 mt-6 mb-3 flex justify-between items-center">
+        <h2 className="font-heading font-700 text-lg">Our Canteens</h2>
+        <button className="text-xs text-primary flex items-center gap-1">
+          See all <ChevronRight className="w-3 h-3" />
+        </button>
+      </div>
+
+      {/* Shops/Canteens List with their own offers */}
+      {loadingShops ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      ) : shops.length === 0 ? (
+        <Card className="mx-5 p-8 text-center">
+          <div className="text-5xl mb-3">🏪</div>
+          <p className="text-muted-foreground">No canteens available</p>
+        </Card>
+      ) : (
+        <div className="px-5 space-y-4">
+          {shops.map((shop) => {
+            const hasOffer = shop.offer && shop.offer.validUntil === getTodayString();
+            const isOpen = shop.isOpen !== false;
+            
+            return (
+              <div key={shop.id} className="space-y-2">
+                {/* Show canteen-specific offer ABOVE the canteen card */}
+                {hasOffer && (
+                  <div className="rounded-xl overflow-hidden bg-gradient-to-r from-accent/20 via-accent/10 to-transparent border border-accent/30">
+                    <div className="p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Gift className="w-4 h-4 text-accent" />
+                        <span className="text-xs font-600 text-accent uppercase tracking-wider">Today's Offer</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-heading font-700 text-base">{shop.offer.title || "Special Offer"}</h3>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <Badge className="bg-accent text-white text-[10px] px-2 py-0">
+                              {shop.offer.percentage}% OFF
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              On orders above ₹{shop.offer.minAmount}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] text-muted-foreground">
+                            Valid {shop.offer.validUntil === getTodayString() ? "Today" : shop.offer.validUntil}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Canteen Card */}
+                <button
+                  onClick={() => isOpen && onShopSelect(shop)}
+                  className="w-full text-left"
+                >
+                  <Card className={`p-4 transition-all active:scale-[0.98] ${isOpen ? "cursor-pointer hover:border-primary/50" : "opacity-60"}`}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h3 className="font-heading font-700 text-lg">{shop.name}</h3>
+                          <Badge 
+                            variant={isOpen ? "default" : "destructive"} 
+                            className="text-[10px] px-2"
+                          >
+                            {isOpen ? "OPEN NOW" : "CLOSED"}
+                          </Badge>
+                        </div>
+                        {shop.slogan && (
+                          <p className="text-sm text-muted-foreground">{shop.slogan}</p>
+                        )}
+                        {shop.address && (
+                          <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                            <MapPin className="w-3 h-3" />
+                            <span>{shop.address}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <span className="text-2xl">🍽️</span>
+                      </div>
+                    </div>
+                  </Card>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ========== MENU SCREEN ==========
+// ========== MENU SCREEN (Updated with Search) ==========
+const MenuScreen = ({ 
+  shop, onBack, onViewHistory, cart, addToCart, updateCartQuantity, removeFromCart, getCartTotal, clearCart
+}: { 
+  shop: any, onBack: () => void, onViewHistory: () => void,
+  cart: any[], addToCart: any, updateCartQuantity: any, removeFromCart: any, getCartTotal: () => number, clearCart: () => void
+}) => {
   const [menuItems, setMenuItems] = useState<InventoryItem[]>([]);
   const [loadingMenu, setLoadingMenu] = useState(true);
-  const [shops, setShops] = useState<any[]>([]);
-  const [loadingShops, setLoadingShops] = useState(true);
-  const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
-  const [selectedShop, setSelectedShop] = useState<any>(null);
-  const [showHistory, setShowHistory] = useState(false);
   const [activeCategory, setActiveCategory] = useState<FoodType>("food");
-  const [showCart, setShowCart] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [showCartSheet, setShowCartSheet] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
-  const [placingOrder, setPlacingOrder] = useState(false);
-  const [orderComplete, setOrderComplete] = useState<{ orderId: string; method: string } | null>(null);
-  const [paymentError, setPaymentError] = useState("");
   const [applyOffer, setApplyOffer] = useState(false);
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+  const [orderComplete, setOrderComplete] = useState<{ orderId: string; method: string } | null>(null);
 
-  const getTodayString = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  };
-
-  // History
-  const [historyOrders, setHistoryOrders] = useState<FirestoreOrder[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
-
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem("skipq_user", JSON.stringify(currentUser));
-      setLocalUser(currentUser);
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    if (!localUser) {
-      navigate("/user-login"); // Not logged in -> Redirect to User Login
-    } else {
-      setIsAuthChecking(false);
-    }
-  }, [localUser, navigate]);
-
-  const fetchShops = async () => {
-    setLoadingShops(true);
-    try {
-      const snap = await getDocs(collection(db, "Shop"));
-      setShops(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (e) { console.error(e); }
-    finally { setLoadingShops(false); }
-  };
-
-  const fetchMenu = async (shopId: string) => {
+  const fetchMenu = async () => {
     setLoadingMenu(true);
     try {
       const snap = await getDocs(
-        query(collection(db, "Shop", shopId, "Inventory"), where("available", "==", true))
+        query(collection(db, "Shop", shop.id, "Inventory"), where("available", "==", true))
       );
       setMenuItems(snap.docs.map((d) => ({ id: d.id, ...d.data() } as InventoryItem)));
     } catch (e) { console.error(e); }
     finally { setLoadingMenu(false); }
   };
 
-  const fetchHistory = async () => {
-    setLoadingHistory(true);
-    try {
-      const rawNumber = localUser?.phoneNumber?.replace("+91", "") ?? null;
-      let snap;
-      if (rawNumber) {
-        snap = await getDocs(
-          query(collection(db, "Orders"), where("user", "==", rawNumber))
-        );
-      } else {
-        snap = await getDocs(collection(db, "Orders"));
-      }
-      const orders = snap.docs
-        .map((d) => ({ id: d.id, ...d.data() } as FirestoreOrder))
-        .sort((a, b) => {
-          const aTime = a.createdAt?.toDate?.() ?? new Date(a.createdAt);
-          const bTime = b.createdAt?.toDate?.() ?? new Date(b.createdAt);
-          return bTime.getTime() - aTime.getTime();
-        });
-      setHistoryOrders(orders);
-    } catch (e) { console.error(e); }
-    finally { setLoadingHistory(false); }
+  useEffect(() => { fetchMenu(); }, [shop.id]);
+
+  // Filter items based on category AND search query
+  const getFilteredItems = () => {
+    let filtered = menuItems.filter((m) => m.type === activeCategory);
+    
+    if (searchQuery.trim()) {
+      const queryLower = searchQuery.toLowerCase();
+      filtered = filtered.filter(item => 
+        item.name.toLowerCase().includes(queryLower) ||
+        (item.description && item.description.toLowerCase().includes(queryLower))
+      );
+    }
+    
+    return filtered;
   };
 
-  useEffect(() => { fetchShops(); }, []);
-  useEffect(() => { if (showHistory) fetchHistory(); }, [showHistory]);
-
-  const activeMenu = menuItems.filter((m) => m.type === activeCategory);
+  const activeMenu = getFilteredItems();
   const cartCount = cart.reduce((s, c) => s + c.cartQuantity, 0);
   const cartItem = (id: string) => cart.find((c) => c.id === id);
-
-  const toMenuItem = (item: InventoryItem) => ({
-    id: item.id, name: item.name, price: item.price,
-    type: item.type, active: item.available, quantity: item.quantity ?? 9999,
-  });
-
-  const handleShopClick = (shop: any) => {
-    setSelectedShopId(shop.id);
-    setSelectedShop(shop);
-    fetchMenu(shop.id);
-  };
-
-  const handleBackToShops = () => {
-    if (cart.length > 0) {
-      if (!confirm("Your cart will be cleared if you leave this shop. Continue?")) return;
-      clearCart();
-    }
-    setSelectedShopId(null);
-    setSelectedShop(null);
-    setMenuItems([]);
-    setApplyOffer(false);
-  };
+  const cartTotal = getCartTotal();
 
   const getDiscountAndTotal = () => {
-    const subtotal = getCartTotal();
+    const subtotal = cartTotal;
     let potentialDiscount = 0;
     let isEligible = false;
 
-    if (selectedShop?.offer) {
-      const offer = selectedShop.offer;
+    if (shop?.offer) {
+      const offer = shop.offer;
       const isToday = offer.validUntil === getTodayString();
       if (isToday && subtotal >= offer.minAmount) {
         isEligible = true;
@@ -270,23 +328,19 @@ const UserHome = () => {
     return { subtotal, discount, potentialDiscount, isEligible, finalTotal: Math.max(0, subtotal - discount) };
   };
 
-  // ── Save order to Firestore after payment confirmed ────────────────────
-  const saveOrder = async (
-    orderId: string,
-    method: "online" | "cash",
-    razorpayPaymentId?: string
-  ) => {
+  const saveOrder = async (orderId: string, method: "online" | "cash", razorpayPaymentId?: string) => {
     const { subtotal, discount, finalTotal } = getDiscountAndTotal();
 
     await addDoc(collection(db, "Orders"), {
       orderId,
-      user: localUser?.phoneNumber?.replace("+91", "") ?? null,
+      user: localStorage.getItem("skipq_user") ? JSON.parse(localStorage.getItem("skipq_user")!).phoneNumber?.replace("+91", "") : null,
       items: cart.map((item) => ({
         id: item.id, name: item.name, price: item.price,
         type: item.type, cartQuantity: item.cartQuantity,
       })),
-      shopId: selectedShopId,
-      shopName: selectedShop?.name || canteen.name,
+      shopId: shop.id,
+      shopName: shop.name,
+      shopAddress: shop.address,
       subtotal,
       discount,
       total: finalTotal,
@@ -298,572 +352,794 @@ const UserHome = () => {
       createdAt: new Date(),
     });
 
-    // Reduce quantity for countable items
     for (const item of cart) {
       const invItem = menuItems.find((m) => m.id === item.id);
       if (invItem?.countable) {
-        await updateDoc(doc(db, "Shop", selectedShopId!, "Inventory", item.id), {
+        await updateDoc(doc(db, "Shop", shop.id, "Inventory", item.id), {
           quantity: increment(-item.cartQuantity),
         });
       }
     }
 
-    clearCart();
-    fetchMenu(selectedShopId!);
+    fetchMenu();
     setApplyOffer(false);
   };
 
-  // ── Cash payment ───────────────────────────────────────────────────────
+  // FIXED: Cash Payment Handler
   const handleCashPayment = async () => {
     setPaymentError("");
     setPlacingOrder(true);
+    
     try {
-      const orderId = await getNextOrderId(selectedShopId!);
-      await saveOrder(orderId, "cash");
+      // Get current user from localStorage
+      const storedUser = localStorage.getItem("skipq_user");
+      const user = storedUser ? JSON.parse(storedUser) : null;
+      const userPhone = user?.phoneNumber?.replace("+91", "") || null;
+      
+      // Get next order ID
+      const orderId = await getNextOrderId(shop.id);
+      const { subtotal, discount, finalTotal } = getDiscountAndTotal();
+      
+      // Create order in Firestore
+      const orderData = {
+        orderId: orderId,
+        user: userPhone,
+        items: cart.map((item) => ({
+          id: item.id, 
+          name: item.name, 
+          price: item.price,
+          type: item.type, 
+          cartQuantity: item.cartQuantity,
+        })),
+        shopId: shop.id,
+        shopName: shop.name,
+        shopAddress: shop.address || "Canteen",
+        subtotal: subtotal,
+        discount: discount,
+        total: finalTotal,
+        paymentMethod: "cash",
+        paymentStatus: "pending",
+        status: "confirmed",
+        served: false,
+        createdAt: new Date(),
+      };
+      
+      console.log("Saving order:", orderData);
+      await addDoc(collection(db, "Orders"), orderData);
+      
+      // Reduce quantity for countable items
+      for (const item of cart) {
+        const invItem = menuItems.find((m) => m.id === item.id);
+        if (invItem?.countable && invItem.quantity) {
+          await updateDoc(doc(db, "Shop", shop.id, "Inventory", item.id), {
+            quantity: increment(-item.cartQuantity),
+          });
+        }
+      }
+      
+      // Refresh menu to update stock
+      await fetchMenu();
+      
+      // Clear cart and show success
+      clearCart();
+      setApplyOffer(false);
       setOrderComplete({ orderId, method: "cash" });
       setShowPayment(false);
-      setShowCart(false);
-    } catch (e) {
-      console.error(e);
-      setPaymentError("Failed to place order. Please try again.");
+      setShowCartSheet(false);
+      
+    } catch (error) {
+      console.error("Cash payment error:", error);
+      setPaymentError("Failed to place order. Please try again: " + (error as Error).message);
     } finally {
       setPlacingOrder(false);
     }
   };
 
-  // ── Razorpay online payment ────────────────────────────────────────────
   const handleOnlinePayment = async () => {
     setPaymentError("");
     setPlacingOrder(true);
 
     const loaded = await loadRazorpay();
     if (!loaded) {
-      setPaymentError("Failed to load payment gateway. Check your internet connection.");
+      setPaymentError("Failed to load payment gateway.");
       setPlacingOrder(false);
       return;
     }
 
     try {
-      const orderId = await getNextOrderId(selectedShopId!);
+      const orderId = await getNextOrderId(shop.id);
       const { finalTotal } = getDiscountAndTotal();
 
       const options = {
         key: RAZORPAY_KEY,
-        amount: finalTotal * 100,          // Razorpay expects paise
+        amount: finalTotal * 100,
         currency: "INR",
-        name: selectedShop?.name || canteen.name,
+        name: shop.name,
         description: `Order ${orderId}`,
-        // image: "/logo.png",         // optional: add your logo URL
         prefill: {
-          contact: localUser?.phoneNumber ?? "",
+          contact: localStorage.getItem("skipq_user") ? JSON.parse(localStorage.getItem("skipq_user")!).phoneNumber : "",
         },
-        notes: {
-          orderId,
-        },
-        theme: {
-          color: "hsl(24, 95%, 53%)",  // matches your --primary
-        },
+        notes: { orderId },
+        theme: { color: "#8B5CF6" },  // Violet color for Razorpay
         handler: async (response: any) => {
-          // Payment successful — response.razorpay_payment_id is available
           try {
             await saveOrder(orderId, "online", response.razorpay_payment_id);
             setOrderComplete({ orderId, method: "online" });
             setShowPayment(false);
-            setShowCart(false);
+            setShowCartSheet(false);
           } catch (e) {
-            console.error("Order save failed after payment:", e);
-
-            // ── AUTO REFUND ────────────────────────────────────────────────
-            setPaymentError(
-              "Payment received but order failed. Initiating refund automatically..."
-            );
-
-            try {
-              const functions = getFunctions();
-              const refundFn = httpsCallable(functions, "refundFailedOrder");
-
-              const result: any = await refundFn({
-                razorpayPaymentId: response.razorpay_payment_id,
-                amount: finalTotal,
-              });
-
-              setPaymentError(
-                `Your payment of ₹${finalTotal} has been refunded ` +
-                `(Refund ID: ${result.data.refundId}). ` +
-                `It will reflect in 5-7 business days. Sorry for the inconvenience.`
-              );
-            } catch (refundErr) {
-              console.error("Refund also failed:", refundErr);
-              setPaymentError(
-                `Payment received but order failed. We couldn't auto-refund. ` +
-                `Please contact support with Payment ID: ${response.razorpay_payment_id} ` +
-                `and we'll refund ₹${finalTotal} manually.`
-              );
-            }
+            console.error("Order save failed:", e);
+            setPaymentError("Payment received but order failed. Refund initiated.");
+            const functions = getFunctions();
+            const refundFn = httpsCallable(functions, "refundFailedOrder");
+            await refundFn({ razorpayPaymentId: response.razorpay_payment_id, amount: finalTotal });
           } finally {
             setPlacingOrder(false);
           }
         },
         modal: {
           ondismiss: () => {
-            // User closed the Razorpay modal without paying
             setPlacingOrder(false);
-            setPaymentError("Payment cancelled. Try again.");
+            setPaymentError("Payment cancelled.");
           },
         },
       };
 
       const rzp = new window.Razorpay(options);
-
       rzp.on("payment.failed", (response: any) => {
-        console.error("Razorpay payment failed:", response.error);
         setPaymentError(`Payment failed: ${response.error.description}`);
         setPlacingOrder(false);
       });
-
       rzp.open();
     } catch (e) {
       console.error(e);
-      setPaymentError("Failed to initialize order. Please try again.");
+      setPaymentError("Failed to initialize order.");
       setPlacingOrder(false);
     }
   };
 
-  const formatTime = (ts: any) => {
-    if (!ts) return "";
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
-    return d.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
-  };
+  const { finalTotal, isEligible, potentialDiscount } = getDiscountAndTotal();
 
-  // ── Payment Modal (shared between Cart & Menu views) ──────────────────
-  const PaymentModal = () => (
-    <div className="fixed inset-0 bg-foreground/50 flex items-center justify-center p-6 z-50">
-      <Card className="p-8 max-w-sm w-full text-center animate-fade-in">
-        <h3 className="font-heading font-700 text-xl mb-2">Total: ₹{getDiscountAndTotal().finalTotal}</h3>
-        <p className="text-muted-foreground mb-6">Choose your payment method</p>
-        <div className="space-y-3">
-          <Button
-            className="w-full h-14 text-lg"
-            onClick={handleOnlinePayment}
-            disabled={placingOrder}
-          >
-            {placingOrder ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : null}
-            📱 Pay Online (UPI / Card)
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full h-14 text-lg"
-            onClick={handleCashPayment}
-            disabled={placingOrder}
-          >
-            💵 Cash Payment
-          </Button>
+  // Order Complete Screen
+  // Order Complete Screen - Updated to match reference image
+  if (orderComplete) {
+    const storedUser = localStorage.getItem("skipq_user");
+    const user = storedUser ? JSON.parse(storedUser) : null;
+    const userPhone = user?.phoneNumber?.replace("+91", "") || "";
+    
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <div className="bg-card border-b border-border px-5 py-4">
+          <h1 className="font-heading font-700 text-xl text-center">Order Status</h1>
         </div>
-        {paymentError && (
-          <p className="text-destructive text-sm mt-3 animate-fade-in">{paymentError}</p>
-        )}
-        <Button
-          variant="ghost"
-          className="mt-4"
-          onClick={() => { setShowPayment(false); setPaymentError(""); }}
-          disabled={placingOrder}
+        
+        <div className="p-5 max-w-md mx-auto">
+          {/* Success Animation */}
+          <div className="text-center mb-6">
+            <div className="w-20 h-20 rounded-full bg-accent/20 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-10 h-10 text-accent" />
+            </div>
+            <h2 className="font-heading font-700 text-xl mb-1">Order Confirmed!</h2>
+            <p className="text-muted-foreground text-sm">
+              Your order has been placed successfully and is being shared with the chef.
+            </p>
+          </div>
+          
+          {/* Order ID Card */}
+          <Card className="p-5 mb-5 text-center bg-secondary/50">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">ORDER ID</p>
+            <p className="text-2xl font-heading font-800 text-primary tracking-wider">{orderComplete.orderId}</p>
+            <button className="text-xs text-primary mt-1">Tap to reveal</button>
+          </Card>
+          
+          {/* Payment Status */}
+          <div className="flex items-center justify-center gap-2 mb-6">
+            <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
+              <CreditCard className="w-4 h-4 text-accent" />
+            </div>
+            <div>
+              <p className="text-sm font-600 text-accent">
+                {orderComplete.method === "online" ? "Paid via UPI" : "Cash Payment"}
+              </p>
+              <p className="text-xs text-muted-foreground">Transaction Successful</p>
+            </div>
+          </div>
+          
+          {/* Order Summary */}
+          <Card className="p-5">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-lg">🏪</span>
+              </div>
+              <div>
+                <p className="font-heading font-700">{shop.name}</p>
+                <p className="text-xs text-muted-foreground">{shop.address || "Main Block, Floor 2"}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              {cart.map((item, i) => (
+                <div key={i} className="flex justify-between text-sm">
+                  <span>
+                    {item.name} 
+                    <span className="text-muted-foreground ml-1">x{item.cartQuantity}</span>
+                  </span>
+                  <span className="font-600">₹{item.price * item.cartQuantity}</span>
+                </div>
+              ))}
+            </div>
+            
+            {getDiscountAndTotal().discount > 0 && (
+              <div className="flex justify-between text-sm text-accent mt-3 pt-2 border-t border-border">
+                <span>Discount Applied</span>
+                <span>-₹{getDiscountAndTotal().discount}</span>
+              </div>
+            )}
+            
+            <div className="flex justify-between mt-3 pt-2 border-t border-border">
+              <span className="font-heading font-700">Total</span>
+              <span className="font-heading font-700 text-primary">₹{getDiscountAndTotal().finalTotal}</span>
+            </div>
+          </Card>
+          
+          {/* Bottom Navigation (Optional) */}
+          <div className="flex justify-around mt-8 pt-4 border-t border-border">
+            <button 
+              onClick={() => window.location.reload()} 
+              className="flex flex-col items-center gap-1 text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Home className="w-5 h-5" />
+              <span className="text-xs">EXPLORE</span>
+            </button>
+            <button className="flex flex-col items-center gap-1 text-primary">
+              <FileText className="w-5 h-5" />
+              <span className="text-xs">ORDERS</span>
+            </button>
+            <button className="flex flex-col items-center gap-1 text-muted-foreground hover:text-primary transition-colors">
+              <User className="w-5 h-5" />
+              <span className="text-xs">PROFILE</span>
+            </button>
+          </div>
+          
+          {/* Action Buttons */}
+          <div className="flex gap-3 mt-6">
+            <Button 
+              variant="outline" 
+              className="flex-1 rounded-full"
+              onClick={() => window.location.reload()}
+            >
+              Explore More
+            </Button>
+            <Button 
+              className="flex-1 rounded-full"
+              onClick={() => {
+                setOrderComplete(null);
+                onBack();
+                clearCart();
+              }}
+            >
+              View Orders
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background pb-28">
+      {/* Header */}
+      <div className="bg-card border-b border-border px-5 py-4 flex items-center gap-3 sticky top-0 z-10">
+        <button onClick={onBack} className="text-muted-foreground">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div className="flex-1">
+          <h1 className="font-heading font-700 text-lg">{shop.name}</h1>
+          {shop.address && <p className="text-xs text-muted-foreground">{shop.address}</p>}
+        </div>
+        {/* Search Button */}
+        <button 
+          onClick={() => setShowSearch(!showSearch)}
+          className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center"
         >
-          Cancel
-        </Button>
-      </Card>
+          <Search className="w-4 h-4 text-muted-foreground" />
+        </button>
+        <button 
+          onClick={onViewHistory} 
+          className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center"
+        >
+          <FileText className="w-4 h-4 text-muted-foreground" />
+        </button>
+      </div>
+
+      {/* Search Bar */}
+      {showSearch && (
+        <div className="px-5 py-3 border-b border-border bg-card animate-fade-in">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search for food, snacks, drinks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-background border-border rounded-xl"
+              autoFocus
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Category Tabs */}
+      <div className="border-b border-border px-5">
+        <div className="flex gap-6">
+          {(["food", "snack", "drink"] as FoodType[]).map((type) => {
+            const count = menuItems.filter(m => m.type === type).length;
+            return (
+              <button
+                key={type}
+                onClick={() => {
+                  setActiveCategory(type);
+                  setSearchQuery(""); // Clear search when changing category
+                }}
+                className={`py-3 text-sm font-600 transition-colors relative ${
+                  activeCategory === type ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                {type === "food" && "🍛 Meals"}
+                {type === "snack" && "🍿 Snacks"}
+                {type === "drink" && "🥤 Drinks"}
+                {count > 0 && (
+                  <span className={`ml-1 text-xs ${activeCategory === type ? "text-primary" : "text-muted-foreground"}`}>
+                    ({count})
+                  </span>
+                )}
+                {activeCategory === type && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Menu Items List */}
+      <div className="p-5 space-y-4">
+        {loadingMenu ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            <p className="text-muted-foreground text-sm">Loading delicious items...</p>
+          </div>
+        ) : activeMenu.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-24 h-24 rounded-full bg-secondary flex items-center justify-center mb-4">
+              {searchQuery ? (
+                <Search className="w-10 h-10 text-muted-foreground" />
+              ) : (
+                <span className="text-5xl">
+                  {activeCategory === "food" && "🍽️"}
+                  {activeCategory === "snack" && "🍿"}
+                  {activeCategory === "drink" && "🥤"}
+                </span>
+              )}
+            </div>
+            <h3 className="font-heading font-700 text-lg mb-1">
+              {searchQuery ? "No results found" : `No ${activeCategory === "food" ? "meals" : activeCategory === "snack" ? "snacks" : "drinks"} available`}
+            </h3>
+            <p className="text-muted-foreground text-sm">
+              {searchQuery 
+                ? `We couldn't find "${searchQuery}" in our menu` 
+                : `Check back later for delicious ${activeCategory === "food" ? "meals" : activeCategory === "snack" ? "snacks" : "beverages"}`}
+            </p>
+            {searchQuery && (
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => setSearchQuery("")}
+              >
+                Clear Search
+              </Button>
+            )}
+          </div>
+        ) : (
+          <>
+            {searchQuery && (
+              <div className="text-sm text-muted-foreground mb-2">
+                Found {activeMenu.length} item{activeMenu.length !== 1 ? "s" : ""} for "{searchQuery}"
+              </div>
+            )}
+            {activeMenu.map((item) => {
+            const inCart = cartItem(item.id);
+            return (
+              <Card key={item.id} className="p-4 flex gap-4 hover:border-primary/50 transition-all">
+                {/* Item Image/Icon */}
+                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center flex-shrink-0">
+                  <span className="text-2xl">
+                    {item.type === "food" && "🍛"}
+                    {item.type === "snack" && "🍿"}
+                    {item.type === "drink" && "🥤"}
+                  </span>
+                </div>
+                
+                {/* Item Details */}
+                <div className="flex-1">
+                  <h3 className="font-heading font-700">{item.name}</h3>
+                  {item.description && (
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>
+                  )}
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-primary font-700 text-lg">₹{item.price}</span>
+                    {item.countable && item.quantity !== undefined && item.quantity < 10 && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        Only {item.quantity} left
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Quantity Controls */}
+                <div className="flex items-center gap-2">
+                  {inCart ? (
+                    <div className="flex items-center gap-2 bg-secondary rounded-full px-2 py-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 rounded-full hover:bg-destructive/10"
+                        onClick={() => updateCartQuantity(item.id, inCart.cartQuantity - 1)}
+                      >
+                        <Minus className="w-3 h-3" />
+                      </Button>
+                      <span className="w-6 text-center font-600 text-sm">{inCart.cartQuantity}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 rounded-full hover:bg-primary/10"
+                        onClick={() => updateCartQuantity(item.id, inCart.cartQuantity + 1)}
+                      >
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button 
+                      size="sm" 
+                      className="rounded-full px-4"
+                      onClick={() => addToCart({ ...item, cartQuantity: 1 })}
+                    >
+                      <Plus className="w-3 h-3 mr-1" /> Add
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            );
+            })}
+          </>
+        )}
+      </div>
+
+      {/* Cart Bottom Bar */}
+      {cart.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border p-4 animate-slide-up">
+          <div className="flex items-center justify-between max-w-md mx-auto">
+            <div>
+              <p className="text-xs text-muted-foreground">Current Order</p>
+              <p className="font-600 text-lg">{cart.length} item{cart.length !== 1 ? "s" : ""} • ₹{finalTotal}</p>
+            </div>
+            <Button onClick={() => setShowCartSheet(true)} className="gap-2 rounded-full px-6">
+              <ShoppingCart className="w-4 h-4" />
+              View Cart
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* // Cart Sheet Component - Replace the existing Cart Sheet in MenuScreen */}
+      {/* Cart Sheet - Updated Premium Design */}
+      <Sheet open={showCartSheet} onOpenChange={setShowCartSheet}>
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto p-0">
+          <div className="p-5 border-b border-border">
+            <SheetHeader className="text-left">
+              <SheetTitle className="text-xl font-heading font-700">Your Cart</SheetTitle>
+            </SheetHeader>
+          </div>
+          
+          <div className="p-5 space-y-4">
+            {/* Shop Info */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-heading font-700">{shop.name}</h3>
+                <p className="text-xs text-muted-foreground">{cart.length} Items</p>
+              </div>
+            </div>
+
+            {/* Cart Items */}
+            <div className="space-y-3">
+              {cart.map((item) => (
+                <div key={item.id} className="flex justify-between items-start py-2">
+                  <div className="flex-1">
+                    <p className="font-600">{item.name}</p>
+                    <p className="text-sm text-primary font-600">₹{item.price}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 bg-secondary rounded-full px-2 py-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6 rounded-full hover:bg-destructive/10"
+                        onClick={() => updateCartQuantity(item.id, item.cartQuantity - 1)}
+                      >
+                        <Minus className="w-3 h-3" />
+                      </Button>
+                      <span className="w-5 text-center text-sm font-600">{item.cartQuantity}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6 rounded-full hover:bg-primary/10"
+                        onClick={() => updateCartQuantity(item.id, item.cartQuantity + 1)}
+                      >
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => removeFromCart(item.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Complete Your Meal Section */}
+            {menuItems.length > 0 && (
+              <div className="mt-6 pt-4 border-t border-border">
+                <h4 className="font-heading font-600 text-sm mb-3 text-muted-foreground">COMPLETE YOUR MEAL</h4>
+                <div className="space-y-3">
+                  {menuItems.slice(0, 3).map((item) => {
+                    const isInCart = cart.some(c => c.id === item.id);
+                    if (isInCart) return null;
+                    return (
+                      <div key={item.id} className="flex justify-between items-center">
+                        <div>
+                          <p className="font-500 text-sm">{item.name}</p>
+                          <p className="text-xs text-primary font-600">₹{item.price}</p>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="rounded-full h-8 px-4 text-xs"
+                          onClick={() => addToCart({ ...item, cartQuantity: 1 })}
+                        >
+                          <Plus className="w-3 h-3 mr-1" /> Add
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Price Breakdown */}
+            <div className="mt-6 pt-4 border-t border-border space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-600">₹{getDiscountAndTotal().subtotal}</span>
+              </div>
+              {getDiscountAndTotal().discount > 0 && (
+                <div className="flex justify-between text-sm text-accent">
+                  <span>Discount ({shop?.offer?.percentage}% OFF)</span>
+                  <span>-₹{getDiscountAndTotal().discount}</span>
+                </div>
+              )}
+              {/* <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Platform Fee</span>
+                <span className="font-600">₹{Math.round(getDiscountAndTotal().finalTotal * 0.05)}</span>
+              </div> */}
+              <div className="flex justify-between pt-2 border-t border-border mt-2">
+                <span className="font-heading font-700">Total Amount</span>
+                <span className="font-heading font-700 text-primary text-lg">
+                  ₹{getDiscountAndTotal().finalTotal}
+                </span>
+              </div>
+            </div>
+
+            {/* Pay Button */}
+            <div className="pt-4">
+              <Button 
+                className="w-full h-14 text-lg rounded-xl"
+                onClick={() => { setShowPayment(true); setShowCartSheet(false); }}
+              >
+                Pay Now ₹{getDiscountAndTotal().finalTotal}
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Payment Modal */}
+      <Dialog open={showPayment} onOpenChange={setShowPayment}>
+        <DialogContent className="sm:max-w-md text-center p-6">
+          <h3 className="font-heading font-700 text-xl mb-1">Total: ₹{finalTotal}</h3>
+          <p className="text-muted-foreground text-sm mb-6">Choose your payment method</p>
+          <div className="space-y-3">
+            <Button className="w-full h-12 rounded-full" onClick={handleOnlinePayment} disabled={placingOrder}>
+              {placingOrder ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              📱 Pay Online (UPI / Card)
+            </Button>
+            <Button variant="outline" className="w-full h-12 rounded-full" onClick={handleCashPayment} disabled={placingOrder}>
+              💵 Cash Payment
+            </Button>
+          </div>
+          {paymentError && <p className="text-destructive text-sm mt-3">{paymentError}</p>}
+          <Button variant="ghost" className="mt-4" onClick={() => setShowPayment(false)}>Cancel</Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
+};
+
+// ========== MAIN USER HOME COMPONENT ==========
+const UserHome = () => {
+  const navigate = useNavigate();
+  const { cart, addToCart, removeFromCart, updateCartQuantity, getCartTotal, clearCart, setCurrentUser } = useStore();
+  const [shops, setShops] = useState<any[]>([]);
+  const [loadingShops, setLoadingShops] = useState(true);
+  const [selectedShop, setSelectedShop] = useState<any>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("skipq_user");
+    if (!storedUser) {
+      navigate("/user-login");
+    } else {
+      setCurrentUser(JSON.parse(storedUser));
+      setIsAuthChecking(false);
+    }
+  }, [navigate, setCurrentUser]);
+
+  useEffect(() => {
+    const fetchShops = async () => {
+      setLoadingShops(true);
+      try {
+        const snap = await getDocs(collection(db, "Shop"));
+        setShops(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (e) { console.error(e); }
+      finally { setLoadingShops(false); }
+    };
+    fetchShops();
+  }, []);
 
   if (isAuthChecking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  // ── Order History Screen ───────────────────────────────────────────────
   if (showHistory) {
+    return <OrderHistoryScreen onBack={() => setShowHistory(false)} />;
+  }
+
+  if (selectedShop) {
     return (
-      <div className="min-h-screen bg-background">
-        <header className="bg-card border-b border-border px-6 py-4 flex items-center gap-4">
-          <button onClick={() => setShowHistory(false)} className="text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="font-heading font-700 text-xl">My Orders</h1>
-        </header>
-
-        <div className="p-4 max-w-lg mx-auto space-y-4">
-          {loadingHistory ? (
-            <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
-              <Loader2 className="w-5 h-5 animate-spin" /> Loading...
-            </div>
-          ) : historyOrders.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="text-5xl mb-4">🍽️</div>
-              <p className="text-muted-foreground">No orders yet.</p>
-            </div>
-          ) : (
-            historyOrders.map((order) => (
-              <Card
-                key={order.id}
-                className={`p-4 border-2 ${order.served ? "border-accent/40 bg-accent/5" : "border-border"}`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="font-heading font-700 text-lg">{order.orderId}</p>
-                    <p className="text-xs text-muted-foreground">{formatTime(order.createdAt)}</p>
-                  {order.shopName && (
-                    <p className="text-xs font-600 text-primary mt-1">🏪 {order.shopName}</p>
-                  )}
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    {order.served ? (
-                      <span className="flex items-center gap-1 text-xs font-700 text-accent">
-                        <CheckCircle2 className="w-3 h-3" /> Served
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs font-700 text-warning">
-                        <Clock className="w-3 h-3" /> Pending
-                      </span>
-                    )}
-                    <Badge
-                      variant={order.paymentMethod === "online" ? "default" : "secondary"}
-                      className="text-xs"
-                    >
-                      {order.paymentMethod === "online" ? "📱 Online" : "💵 Cash"}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="space-y-1 mb-3">
-                  {order.items.map((item, i) => (
-                    <div key={i} className="flex justify-between text-sm text-muted-foreground">
-                      <span>{item.name} × {item.cartQuantity}</span>
-                      <span>₹{item.price * item.cartQuantity}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {order.discount ? (
-                  <div className="flex justify-between text-xs text-accent mt-1 mb-2">
-                    <span>Discount applied</span>
-                    <span>-₹{order.discount}</span>
-                  </div>
-                ) : null}
-                <div className="flex justify-between items-center border-t border-border pt-2">
-                  <span className="text-sm font-600">Total</span>
-                  <span className="font-heading font-700 text-primary">₹{order.total}</span>
-                </div>
-              </Card>
-            ))
-          )}
-        </div>
-      </div>
+      <MenuScreen
+        shop={selectedShop}
+        onBack={() => {
+          clearCart();
+          setSelectedShop(null);
+        }}
+        onViewHistory={() => setShowHistory(true)}
+        cart={cart}
+        addToCart={addToCart}
+        updateCartQuantity={updateCartQuantity}
+        removeFromCart={removeFromCart}
+        getCartTotal={getCartTotal}
+        clearCart={clearCart}
+      />
     );
   }
 
-  // ── Order Complete ─────────────────────────────────────────────────────
-  if (orderComplete) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <Card className="p-8 text-center max-w-md w-full animate-fade-in">
-          <div className="text-6xl mb-4">{orderComplete.method === "online" ? "✅" : "🧾"}</div>
-          <h2 className="font-heading font-700 text-2xl mb-2">Order Confirmed!</h2>
-          <p className="text-muted-foreground mb-4">
-            {orderComplete.method === "online"
-              ? "Payment received. Thank you!"
-              : "Please pay cash at the counter"}
-          </p>
-          <div className="bg-secondary rounded-xl p-4 mb-6">
-            <p className="text-sm text-muted-foreground">Your Order ID</p>
-            <p className="text-3xl font-heading font-800 text-primary">{orderComplete.orderId}</p>
-          </div>
-          <Button
-            onClick={() => { setOrderComplete(null); setSelectedShopId(null); }}
-            className="w-full"
-          >
-            Back to Home
-          </Button>
-        </Card>
-      </div>
-    );
-  }
-
-  // ── Cart ───────────────────────────────────────────────────────────────
-  if (showCart) {
-    const { subtotal, discount, potentialDiscount, isEligible, finalTotal } = getDiscountAndTotal();
-
-    return (
-      <div className="min-h-screen bg-background">
-        <header className="bg-card border-b border-border px-6 py-4 flex items-center gap-4">
-          <button onClick={() => setShowCart(false)} className="text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="font-heading font-700 text-xl">Your Cart</h1>
-        </header>
-        <div className="p-6 max-w-lg mx-auto space-y-4">
-          {cart.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">Your cart is empty</p>
-            </div>
-          ) : (
-            <>
-              {cart.map((item) => (
-                <Card key={item.id} className="p-4 flex items-center justify-between">
-                  <div>
-                    <p className="font-600">{foodTypeEmojis[item.type as FoodType]} {item.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      ₹{item.price} × {item.cartQuantity} = ₹{item.price * item.cartQuantity}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="icon" className="h-8 w-8"
-                      onClick={() => updateCartQuantity(item.id, item.cartQuantity - 1)}>
-                      <Minus className="w-3 h-3" />
-                    </Button>
-                    <span className="w-6 text-center font-600">{item.cartQuantity}</span>
-                    <Button variant="outline" size="icon" className="h-8 w-8"
-                      onClick={() => updateCartQuantity(item.id, item.cartQuantity + 1)}>
-                      <Plus className="w-3 h-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"
-                      onClick={() => removeFromCart(item.id)}>
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-
-              {selectedShop?.offer && selectedShop.offer.validUntil === getTodayString() && (
-                <Card className="p-4 border-2 border-dashed border-primary/50 bg-primary/5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-3">
-                      <div className="mt-1 bg-primary/20 p-2 rounded-full text-primary">
-                        <Gift className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="font-heading font-700 text-primary">{selectedShop.offer.title}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Save {selectedShop.offer.percentage}% on orders above ₹{selectedShop.offer.minAmount}
-                        </p>
-                        {isEligible && applyOffer && potentialDiscount > 0 && (
-                          <p className="text-xs font-600 text-accent mt-1">
-                            Yay! You saved ₹{potentialDiscount}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      {isEligible ? (
-                        <Button
-                          variant={applyOffer ? "outline" : "default"}
-                          size="sm"
-                          className={applyOffer ? "text-destructive hover:text-destructive border-destructive" : ""}
-                          onClick={() => setApplyOffer(!applyOffer)}
-                        >
-                          {applyOffer ? "Remove" : "Apply"}
-                        </Button>
-                      ) : (
-                        <p className="text-xs font-600 text-muted-foreground text-right w-20">
-                          Add ₹{selectedShop.offer.minAmount - subtotal} more
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-              <Card className="p-4 bg-secondary">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-sm">
-                    <span>Subtotal</span><span className="font-600">₹{subtotal}</span>
-                  </div>
-                  {discount > 0 && <div className="flex justify-between items-center text-sm text-accent"><span>Discount ({selectedShop.offer.percentage}%)</span><span className="font-600">-₹{discount}</span></div>}
-                  <div className="flex justify-between items-center border-t border-border/50 pt-2">
-                    <span className="font-heading font-600">Total</span>
-                    <span className="text-2xl font-heading font-800 text-primary">₹{finalTotal}</span>
-                  </div>
-                </div>
-              </Card>
-              <Button className="w-full h-12 text-lg" onClick={() => { setPaymentError(""); setShowPayment(true); }}>
-                Pay Now
-              </Button>
-            </>
-          )}
-        </div>
-        {showPayment && <PaymentModal />}
-      </div>
-    );
-  }
-
-  // ── Menu ───────────────────────────────────────────────────────────────
-  if (selectedShopId) {
-    return (
-      <div className="min-h-screen bg-background">
-        <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button onClick={handleBackToShops} className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="font-heading font-700 text-xl">{selectedShop?.name}</h1>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setShowHistory(true)}>
-              <History className="w-4 h-4 mr-1" /> Orders
-            </Button>
-            <Button variant="outline" size="sm" className="relative" onClick={() => setShowCart(true)}>
-              <ShoppingCart className="w-4 h-4 mr-1" /> Cart
-              {cartCount > 0 && (
-                <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                  {cartCount}
-                </Badge>
-              )}
-            </Button>
-            {cart.length > 0 && (
-              <Button size="sm" onClick={() => { setPaymentError(""); setShowPayment(true); }}>
-                Pay ₹{getDiscountAndTotal().finalTotal}
-              </Button>
-            )}
-          </div>
-        </header>
-
-        <div className="flex border-b border-border">
-          {(["food", "snack", "drink"] as FoodType[]).map((type) => (
-            <button
-              key={type}
-              onClick={() => setActiveCategory(type)}
-              className={`flex-1 py-4 text-center font-heading font-600 transition-colors ${
-                activeCategory === type
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {foodTypeLabels[type]}
-            </button>
-          ))}
-        </div>
-
-        <div className="p-4 grid gap-3 max-w-2xl mx-auto">
-          {loadingMenu ? (
-            <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
-              <Loader2 className="w-5 h-5 animate-spin" /> Loading menu...
-            </div>
-          ) : activeMenu.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">No items available</div>
-          ) : (
-            activeMenu.map((item) => {
-              const inCart = cartItem(item.id);
-              return (
-                <Card key={item.id} className="p-4 flex items-center justify-between animate-fade-in">
-                  <div>
-                    <p className="font-600 text-card-foreground">{item.name}</p>
-                    <p className="text-primary font-heading font-700">₹{item.price}</p>
-                    {item.countable && item.quantity !== undefined && (
-                      <p className="text-xs text-muted-foreground">Stock: {item.quantity}</p>
-                    )}
-                    {!item.countable && (
-                      <p className="text-xs text-accent">Always available</p>
-                    )}
-                  </div>
-                  {inCart ? (
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="icon" className="h-8 w-8"
-                        onClick={() => updateCartQuantity(item.id, inCart.cartQuantity - 1)}>
-                        <Minus className="w-3 h-3" />
-                      </Button>
-                      <span className="w-6 text-center font-600">{inCart.cartQuantity}</span>
-                      <Button variant="outline" size="icon" className="h-8 w-8"
-                        onClick={() => updateCartQuantity(item.id, inCart.cartQuantity + 1)}>
-                        <Plus className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button size="sm" onClick={() => addToCart(toMenuItem(item))}>
-                      <Plus className="w-4 h-4 mr-1" /> Add
-                    </Button>
-                  )}
-                </Card>
-              );
-            })
-          )}
-        </div>
-
-        {showPayment && <PaymentModal />}
-      </div>
-    );
-  }
-
-  // ── Available Shops ────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link to="/" className="text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <h1 className="font-heading font-700 text-xl">Available Shops</h1>
-        </div>
-        <div className="flex items-center gap-4">
-          {localUser && (
-            <span className="text-sm font-600 text-muted-foreground hidden sm:inline-block">
-              {localUser.phoneNumber}
-            </span>
-          )}
-          <Button variant="outline" size="sm" onClick={() => setShowHistory(true)}>
-            <History className="w-4 h-4 mr-2" /> My Orders
-          </Button>
-        </div>
-      </header>
+    <HomeScreen
+      shops={shops}
+      loadingShops={loadingShops}
+      onShopSelect={setSelectedShop}
+      onViewHistory={() => setShowHistory(true)}
+    />
+  );
+};
 
-      <div className="p-6 max-w-5xl mx-auto space-y-6">
-        {loadingShops ? (
-          <div className="flex justify-center py-12 text-muted-foreground">
-            <Loader2 className="w-8 h-8 animate-spin" />
+// ========== ORDER HISTORY SCREEN ==========
+const OrderHistoryScreen = ({ onBack }: { onBack: () => void }) => {
+  const [orders, setOrders] = useState<FirestoreOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      setLoading(true);
+      try {
+        const user = localStorage.getItem("skipq_user");
+        const phoneNumber = user ? JSON.parse(user).phoneNumber?.replace("+91", "") : null;
+        const snap = await getDocs(
+          query(collection(db, "Orders"), where("user", "==", phoneNumber))
+        );
+        const fetched = snap.docs.map(d => ({ id: d.id, ...d.data() } as FirestoreOrder));
+        fetched.sort((a, b) => {
+          const aTime = a.createdAt?.toDate?.() ?? new Date(a.createdAt);
+          const bTime = b.createdAt?.toDate?.() ?? new Date(b.createdAt);
+          return bTime.getTime() - aTime.getTime();
+        });
+        setOrders(fetched);
+      } catch (e) { console.error(e); }
+      finally { setLoading(false); }
+    };
+    fetchOrders();
+  }, []);
+
+  const formatTime = (ts: any) => {
+    if (!ts) return "";
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    return d.toLocaleDateString("en-IN", { month: "short", day: "numeric" });
+  };
+
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      <div className="bg-card border-b border-border px-5 py-4 flex items-center gap-3 sticky top-0 z-10">
+        <button onClick={onBack} className="text-muted-foreground">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h1 className="font-heading font-700 text-xl">My Orders</h1>
+      </div>
+
+      <div className="p-5 space-y-4">
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+        ) : orders.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-5xl mb-4">🍽️</div>
+            <p className="text-muted-foreground">No orders yet</p>
           </div>
-        ) : shops.length === 0 ? (
-          <Card className="p-12 text-center max-w-md mx-auto animate-fade-in">
-            <div className="text-6xl mb-4">🏪</div>
-            <h2 className="font-heading font-700 text-xl mb-2">No Shops Yet</h2>
-            <p className="text-muted-foreground">Check back later when a shop is added.</p>
-          </Card>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {shops.map((shop) => {
-              const hasOffer = shop.isOpen !== false && shop.offer && shop.offer.validUntil === getTodayString();
-              return (
-                <Card
-                  key={shop.id}
-                  className={`p-6 relative transition-all group animate-fade-in ${shop.isOpen !== false ? "cursor-pointer hover:border-primary hover:shadow-md" : "opacity-70 cursor-not-allowed"}`}
-                  onClick={() => shop.isOpen !== false ? handleShopClick(shop) : alert(`${shop.name} is currently closed.`)}
-                >
-                  <div className="absolute top-4 right-4">
-                    <Badge variant={shop.isOpen !== false ? "default" : "destructive"}>
-                      {shop.isOpen !== false ? "Open" : "Closed"}
-                    </Badge>
+          orders.map((order) => (
+            <Card key={order.id} className="p-4">
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <p className="font-heading font-700 text-lg">{order.orderId}</p>
+                  <p className="text-xs text-muted-foreground">{formatTime(order.createdAt)}</p>
+                </div>
+                <Badge variant={order.served ? "default" : "secondary"} className="text-xs">
+                  {order.served ? "Completed" : "Preparing"}
+                </Badge>
+              </div>
+              <div className="space-y-1 mb-3">
+                {order.items.slice(0, 2).map((item, i) => (
+                  <div key={i} className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">{item.name} × {item.cartQuantity}</span>
+                    <span>₹{item.price * item.cartQuantity}</span>
                   </div>
-                  <div className="text-4xl mb-4 group-hover:scale-110 transition-transform inline-block">🏪</div>
-                  <h2 className="font-heading font-700 text-xl mb-1 group-hover:text-primary transition-colors">
-                    {shop.name}
-                  </h2>
-                  {shop.slogan && <p className="text-sm text-muted-foreground">{shop.slogan}</p>}
-                  
-                  {hasOffer && (
-                    <div className="mt-4 bg-accent/10 border border-accent/20 rounded-lg p-3 text-left">
-                      <p className="text-sm font-700 text-accent flex items-center gap-1">
-                        <Gift className="w-4 h-4" /> {shop.offer.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {shop.offer.percentage}% OFF on orders above ₹{shop.offer.minAmount}
-                      </p>
-                    </div>
-                  )}
-                </Card>
-              );
-            })}
-          </div>
+                ))}
+                {order.items.length > 2 && (
+                  <p className="text-xs text-muted-foreground">+{order.items.length - 2} more items</p>
+                )}
+              </div>
+              <div className="flex justify-between items-center border-t border-border pt-2">
+                <span className="text-sm font-600">Total</span>
+                <span className="font-heading font-700 text-primary">₹{order.total}</span>
+              </div>
+            </Card>
+          ))
         )}
       </div>
     </div>
