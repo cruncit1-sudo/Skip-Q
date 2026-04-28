@@ -5,7 +5,7 @@ import { db } from "@/lib/firebase";
 import {
   collection, getDocs, query, where,
   addDoc, doc, updateDoc, increment,
-  runTransaction,
+  runTransaction, setDoc, deleteDoc,
 } from "firebase/firestore";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
-  ArrowLeft, ShoppingCart, Plus, Minus, Trash2,
+  ArrowLeft, ShoppingCart, Plus, Minus, Trash2, Star,
   Loader2, Clock, Gift, ChevronRight, 
   Home, Search, FileText, User, MapPin, 
-  CreditCard, CheckCircle2, X, Sparkles, Flame
+  CreditCard, CheckCircle2, X, Sparkles, Flame, LogOut
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -42,7 +42,7 @@ const loadRazorpay = (): Promise<boolean> =>
     document.body.appendChild(script);
   });
 
-type FoodType = "food" | "snack" | "drink";
+type FoodType = "food" | "snack" | "drink" | "favorite";
 
 interface InventoryItem {
   id: string;
@@ -94,13 +94,24 @@ const getNextOrderId = async (shopId: string) => {
       nextCount = 0;
     } else {
       nextCount = currentCount + 1;
-      if (nextCount > 9999) nextCount = 0;
+        // Total combinations for 2 letters and 2 numbers: 26 * 26 * 100 = 67600
+        if (nextCount >= 67600) nextCount = 0;
     }
     transaction.update(shopRef, { orderCount: nextCount });
     return nextCount;
   });
 
-  const newOrderId = String(nextNum).padStart(4, "0");
+  // Randomize the sequential number to avoid repeating sequential patterns
+  // This mathematical formula ensures a 1-to-1 mapping without any repeats until all 67600 are used
+  const randomizedNum = (nextNum * 9301 + 11111) % 67600;
+
+  // Convert to 2 letters + 2 numbers format (e.g., AA00 to ZZ99)
+  const numPart = randomizedNum % 100;
+  const letterPart = Math.floor(randomizedNum / 100);
+  const firstLetter = String.fromCharCode(65 + Math.floor(letterPart / 26));
+  const secondLetter = String.fromCharCode(65 + (letterPart % 26));
+
+  const newOrderId = `${firstLetter}${secondLetter}${String(numPart).padStart(2, "0")}`;
   
   try {
     const q = query(collection(db, "Orders"), where("shopId", "==", shopId), where("orderId", "==", newOrderId));
@@ -116,11 +127,12 @@ const getNextOrderId = async (shopId: string) => {
 // ========== HOME SCREEN ==========
 // ========== HOME SCREEN (Updated) ==========
 const HomeScreen = ({ 
-  shops, loadingShops, onShopSelect, onViewHistory 
+  shops, loadingShops, onShopSelect, onViewHistory, onLogout 
 }: { 
   shops: any[], loadingShops: boolean, 
   onShopSelect: (shop: any) => void,
-  onViewHistory: () => void 
+  onViewHistory: () => void,
+  onLogout: () => void
 }) => {
   const { currentUser } = useStore();
   const greeting = () => {
@@ -144,12 +156,20 @@ const HomeScreen = ({
               {displayName}
             </h1>
           </div>
-          <button 
-            onClick={onViewHistory}
-            className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center"
-          >
-            <FileText className="w-5 h-5 text-muted-foreground" />
-          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={onViewHistory}
+              className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center"
+            >
+              <FileText className="w-5 h-5 text-muted-foreground" />
+            </button>
+            <button 
+              onClick={onLogout}
+              className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center hover:bg-destructive/10 transition-colors"
+            >
+              <LogOut className="w-5 h-5 text-destructive" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -262,6 +282,8 @@ const MenuScreen = ({
   const [menuItems, setMenuItems] = useState<InventoryItem[]>([]);
   const [loadingMenu, setLoadingMenu] = useState(true);
   const [activeCategory, setActiveCategory] = useState<FoodType>("food");
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [showCartSheet, setShowCartSheet] = useState(false);
@@ -270,6 +292,7 @@ const MenuScreen = ({
   const [placingOrder, setPlacingOrder] = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const [orderComplete, setOrderComplete] = useState<{ orderId: string; method: string } | null>(null);
+  const { currentUser } = useStore();
 
   const fetchMenu = async () => {
     setLoadingMenu(true);
@@ -284,19 +307,63 @@ const MenuScreen = ({
 
   useEffect(() => { fetchMenu(); }, [shop.id]);
 
+  useEffect(() => {
+    if (!currentUser?.phoneNumber) return;
+    const userDocId = currentUser.phoneNumber;
+
+    const fetchFavorites = async () => {
+        setLoadingFavorites(true);
+        try {
+            // Assuming 'Users' collection with doc ID as phone number
+            const favsCollectionRef = collection(db, "users", userDocId, "Favorites");
+            const favSnap = await getDocs(favsCollectionRef);
+            const favIds = favSnap.docs.map(doc => doc.id);
+            setFavorites(favIds);
+        } catch (e) {
+            console.error("Error fetching favorites:", e);
+        } finally {
+            setLoadingFavorites(false);
+        }
+    };
+
+    fetchFavorites();
+  }, [currentUser]);
+
+  const toggleFavorite = async (itemId: string) => {
+    if (!currentUser?.phoneNumber) return;
+    const userDocId = currentUser.phoneNumber;
+    const favDocRef = doc(db, "users", userDocId, "Favorites", itemId);
+
+    const isFavorite = favorites.includes(itemId);
+
+    try {
+        if (isFavorite) {
+            await deleteDoc(favDocRef);
+            setFavorites(favs => favs.filter(id => id !== itemId));
+        } else {
+            await setDoc(favDocRef, { addedAt: new Date() });
+            setFavorites(favs => [...favs, itemId]);
+        }
+    } catch (e) {
+        console.error("Error updating favorite:", e);
+    }
+  };
+
   // Filter items based on category AND search query
   const getFilteredItems = () => {
-    let filtered = menuItems.filter((m) => m.type === activeCategory);
+    let baseItems = activeCategory === 'favorite'
+      ? menuItems.filter(item => favorites.includes(item.id))
+      : menuItems.filter((m) => m.type === activeCategory);
     
     if (searchQuery.trim()) {
       const queryLower = searchQuery.toLowerCase();
-      filtered = filtered.filter(item => 
+      return baseItems.filter(item => 
         item.name.toLowerCase().includes(queryLower) ||
         (item.description && item.description.toLowerCase().includes(queryLower))
       );
     }
     
-    return filtered;
+    return baseItems;
   };
 
   const activeMenu = getFilteredItems();
@@ -681,8 +748,15 @@ const MenuScreen = ({
       {/* Category Tabs */}
       <div className="border-b border-border px-5">
         <div className="flex gap-6">
-          {(["food", "snack", "drink"] as FoodType[]).map((type) => {
-            const count = menuItems.filter(m => m.type === type).length;
+          {(["food", "snack", "drink", "favorite"] as FoodType[]).map((type) => {
+            const count = type === 'favorite' ? favorites.length : menuItems.filter(m => m.type === type).length;
+            const label = {
+              food: "🍛 Meals",
+              snack: "🍿 Snacks",
+              drink: "🥤 Drinks",
+              favorite: <><Star className="w-4 h-4 mr-1.5" /><span>Favorites</span></>
+            }[type];
+
             return (
               <button
                 key={type}
@@ -694,14 +768,10 @@ const MenuScreen = ({
                   activeCategory === type ? "text-primary" : "text-muted-foreground"
                 }`}
               >
-                {type === "food" && "🍛 Meals"}
-                {type === "snack" && "🍿 Snacks"}
-                {type === "drink" && "🥤 Drinks"}
-                {count > 0 && (
-                  <span className={`ml-1 text-xs ${activeCategory === type ? "text-primary" : "text-muted-foreground"}`}>
-                    ({count})
-                  </span>
-                )}
+                <div className="flex items-center">
+                  {label}
+                  {count > 0 && <span className={`ml-1.5 text-xs`}>({count})</span>}
+                </div>
                 {activeCategory === type && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
                 )}
@@ -713,7 +783,7 @@ const MenuScreen = ({
 
       {/* Menu Items List */}
       <div className="p-5 space-y-4">
-        {loadingMenu ? (
+        {loadingMenu || (activeCategory === 'favorite' && loadingFavorites) ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
             <p className="text-muted-foreground text-sm">Loading delicious items...</p>
@@ -728,6 +798,7 @@ const MenuScreen = ({
                   {activeCategory === "food" && "🍽️"}
                   {activeCategory === "snack" && "🍿"}
                   {activeCategory === "drink" && "🥤"}
+                  {activeCategory === "favorite" && "⭐"}
                 </span>
               )}
             </div>
@@ -786,36 +857,52 @@ const MenuScreen = ({
                 </div>
                 
                 {/* Quantity Controls */}
-                <div className="flex items-center gap-2">
-                  {inCart ? (
-                    <div className="flex items-center gap-2 bg-secondary rounded-full px-2 py-1">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-7 w-7 rounded-full hover:bg-destructive/10"
-                        onClick={() => updateCartQuantity(item.id, inCart.cartQuantity - 1)}
-                      >
-                        <Minus className="w-3 h-3" />
-                      </Button>
-                      <span className="w-6 text-center font-600 text-sm">{inCart.cartQuantity}</span>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-7 w-7 rounded-full hover:bg-primary/10"
-                        onClick={() => updateCartQuantity(item.id, inCart.cartQuantity + 1)}
-                      >
-                        <Plus className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button 
-                      size="sm" 
-                      className="rounded-full px-4"
-                      onClick={() => addToCart({ ...item, cartQuantity: 1 })}
+                <div className="flex flex-col items-end justify-between -my-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(item.id);
+                      }}
                     >
-                      <Plus className="w-3 h-3 mr-1" /> Add
+                      <Star className={`w-5 h-5 transition-all ${
+                        favorites.includes(item.id) ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/50 hover:text-muted-foreground'
+                      }`} />
                     </Button>
-                  )}
+
+                    <div className="flex items-center gap-2">
+                      {inCart ? (
+                        <div className="flex items-center gap-2 bg-secondary rounded-full px-2 py-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 rounded-full hover:bg-destructive/10"
+                            onClick={() => updateCartQuantity(item.id, inCart.cartQuantity - 1)}
+                          >
+                            <Minus className="w-3 h-3" />
+                          </Button>
+                          <span className="w-6 text-center font-600 text-sm">{inCart.cartQuantity}</span>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 rounded-full hover:bg-primary/10"
+                            onClick={() => updateCartQuantity(item.id, inCart.cartQuantity + 1)}
+                          >
+                            <Plus className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          className="rounded-full px-4"
+                          onClick={() => addToCart({ ...item, cartQuantity: 1 })}
+                        >
+                          <Plus className="w-3 h-3 mr-1" /> Add
+                        </Button>
+                      )}
+                    </div>
                 </div>
               </Card>
             );
@@ -1020,6 +1107,12 @@ const UserHome = () => {
     fetchShops();
   }, []);
 
+  const handleLogout = () => {
+    localStorage.removeItem("skipq_user");
+    setCurrentUser(null);
+    navigate("/user-login");
+  };
+
   if (isAuthChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1057,6 +1150,7 @@ const UserHome = () => {
       loadingShops={loadingShops}
       onShopSelect={setSelectedShop}
       onViewHistory={() => setShowHistory(true)}
+      onLogout={handleLogout}
     />
   );
 };
