@@ -36,7 +36,12 @@ export default function PhoneLogin({ onLoginSuccess }: { onLoginSuccess?: () => 
         await setDoc(userRef, { lastLogin: new Date() }, { merge: true });
       }
 
-      setCurrentUser({ phoneNumber: formattedNumber });
+      const userData = { phoneNumber: formattedNumber };
+
+      // ✅ Save to localStorage so UserHome can read it after navigation/reload
+      localStorage.setItem("skipq_user", JSON.stringify(userData));
+
+      setCurrentUser(userData);
       if (onLoginSuccess) onLoginSuccess();
     } catch (err: any) {
       console.error(err);
