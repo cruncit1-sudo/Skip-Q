@@ -25,15 +25,6 @@ export interface Order {
   createdAt: Date;
 }
 
-export interface StaffMember {
-  id: string;
-  name: string;
-  staffId: string;
-  password: string;
-  active: boolean;
-  createdAt: Date;
-}
-
 export interface Canteen {
   id: string;
   name: string;

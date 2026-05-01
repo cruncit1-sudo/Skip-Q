@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { CartItem, MenuItem, Order, StaffMember, Canteen } from "./types";
+import { CartItem, MenuItem, Canteen } from "./types";
 
 const generateOrderId = () => {
   const chars = "0123456789";

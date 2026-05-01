@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Landing from "./pages/Landing";
 import UserHome from "./pages/UserHome";
 import NotFound from "./pages/NotFound";
-import Login from "./components/Login";
 import UserPhoneLogin from "./pages/UserPhoneLogin";
 
 const queryClient = new QueryClient();
@@ -20,7 +19,6 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/user-login" element={<UserPhoneLogin />} />
-          <Route path="/login" element={<Login />} />
           <Route path="/user" element={<UserHome />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

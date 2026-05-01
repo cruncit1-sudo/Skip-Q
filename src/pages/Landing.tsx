@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { UtensilsCrossed, ShieldCheck, Receipt, Sparkles } from "lucide-react";
+import { UtensilsCrossed, Sparkles } from "lucide-react";
 
 const Landing = () => {
   return (
@@ -54,40 +54,6 @@ const Landing = () => {
           <h2 className="font-heading font-700 text-xl mb-2 text-foreground">Order Food</h2>
           <p className="text-muted-foreground text-sm">Browse menu & place orders</p>
         </Link>
-{/* 
-        <Link to="/login?role=admin" className="group relative overflow-hidden rounded-2xl p-7 border transition-all duration-300 hover:-translate-y-1"
-          style={{
-            background: "hsl(240 22% 10%)",
-            borderColor: "hsl(240 18% 16%)",
-          }}
-          onMouseEnter={e => (e.currentTarget.style.borderColor = "hsl(160 65% 45% / 0.5)")}
-          onMouseLeave={e => (e.currentTarget.style.borderColor = "hsl(240 18% 16%)")}>
-          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl pointer-events-none"
-            style={{ background: "radial-gradient(circle at top left, hsl(160 65% 45% / 0.08), transparent 60%)" }} />
-          <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-5 transition-all duration-300"
-            style={{ background: "hsl(160 65% 45% / 0.15)" }}>
-            <ShieldCheck className="w-7 h-7" style={{ color: "hsl(160 65% 60%)" }} />
-          </div>
-          <h2 className="font-heading font-700 text-xl mb-2 text-foreground">Admin Panel</h2>
-          <p className="text-muted-foreground text-sm">Manage inventory & staff</p>
-        </Link>
-
-        <Link to="/login?role=billing" className="group relative overflow-hidden rounded-2xl p-7 border transition-all duration-300 hover:-translate-y-1 flex flex-col items-center text-center md:col-start-2"
-          style={{
-            background: "hsl(240 22% 10%)",
-            borderColor: "hsl(240 18% 16%)",
-          }}
-          onMouseEnter={e => (e.currentTarget.style.borderColor = "hsl(38 90% 52% / 0.5)")}
-          onMouseLeave={e => (e.currentTarget.style.borderColor = "hsl(240 18% 16%)")}>
-          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl pointer-events-none"
-            style={{ background: "radial-gradient(circle at top left, hsl(38 90% 52% / 0.08), transparent 60%)" }} />
-          <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-5 transition-all duration-300"
-            style={{ background: "hsl(38 90% 52% / 0.15)" }}>
-            <Receipt className="w-7 h-7" style={{ color: "hsl(38 90% 65%)" }} />
-          </div>
-          <h2 className="font-heading font-700 text-xl mb-2 text-foreground">Billing</h2>
-          <p className="text-muted-foreground text-sm">Verify orders & print bills</p>
-        </Link> */}
       </div>
 
       {/* Footer */}
