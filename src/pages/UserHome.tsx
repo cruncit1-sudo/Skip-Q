@@ -291,7 +291,14 @@ const MenuScreen = ({
   const [applyOffer, setApplyOffer] = useState(false);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [paymentError, setPaymentError] = useState("");
-  const [orderComplete, setOrderComplete] = useState<{ orderId: string; method: string } | null>(null);
+  const [orderComplete, setOrderComplete] = useState<{ 
+    orderId: string; 
+    method: string;
+    items: any[];
+    total: number;
+    discount: number;
+    subtotal: number;
+  } | null>(null);
   const { currentUser } = useStore();
 
   const fetchMenu = async () => {
@@ -487,10 +494,16 @@ const MenuScreen = ({
       // Refresh menu to update stock
       await fetchMenu();
       
-      // Clear cart and show success
-      clearCart();
+      // Show success
       setApplyOffer(false);
-      setOrderComplete({ orderId, method: "cash" });
+      setOrderComplete({ 
+        orderId, 
+        method: "cash",
+        items: [...cart],
+        total: finalTotal,
+        discount: discount,
+        subtotal: subtotal
+      });
       setShowPayment(false);
       setShowCartSheet(false);
       
@@ -531,7 +544,14 @@ const MenuScreen = ({
         handler: async (response: any) => {
           try {
             await saveOrder(orderId, "online", response.razorpay_payment_id);
-            setOrderComplete({ orderId, method: "online" });
+            setOrderComplete({ 
+              orderId, 
+              method: "online",
+              items: [...cart],
+              total: finalTotal,
+              discount: getDiscountAndTotal().discount,
+              subtotal: getDiscountAndTotal().subtotal
+            });
             setShowPayment(false);
             setShowCartSheet(false);
           } catch (e) {
@@ -626,7 +646,7 @@ const MenuScreen = ({
             </div>
             
             <div className="space-y-2">
-              {cart.map((item, i) => (
+              {orderComplete.items.map((item: any, i: number) => (
                 <div key={i} className="flex justify-between text-sm">
                   <span>
                     {item.name} 
@@ -637,16 +657,16 @@ const MenuScreen = ({
               ))}
             </div>
             
-            {getDiscountAndTotal().discount > 0 && (
+            {orderComplete.discount > 0 && (
               <div className="flex justify-between text-sm text-accent mt-3 pt-2 border-t border-border">
                 <span>Discount Applied</span>
-                <span>-₹{getDiscountAndTotal().discount}</span>
+                <span>-₹{orderComplete.discount}</span>
               </div>
             )}
             
             <div className="flex justify-between mt-3 pt-2 border-t border-border">
               <span className="font-heading font-700">Total</span>
-              <span className="font-heading font-700 text-primary">₹{getDiscountAndTotal().finalTotal}</span>
+              <span className="font-heading font-700 text-primary">₹{orderComplete.total}</span>
             </div>
           </Card>
           
@@ -1159,6 +1179,7 @@ const UserHome = () => {
 const OrderHistoryScreen = ({ onBack }: { onBack: () => void }) => {
   const [orders, setOrders] = useState<FirestoreOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<FirestoreOrder | null>(null);
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -1188,6 +1209,97 @@ const OrderHistoryScreen = ({ onBack }: { onBack: () => void }) => {
     return d.toLocaleDateString("en-IN", { month: "short", day: "numeric" });
   };
 
+  const formatDateTime = (ts: any) => {
+    if (!ts) return "";
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    return d.toLocaleString("en-IN", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+  };
+
+  if (selectedOrder) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <div className="bg-card border-b border-border px-5 py-4 flex items-center gap-3 sticky top-0 z-10">
+          <button onClick={() => setSelectedOrder(null)} className="text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h1 className="font-heading font-700 text-xl">Order Details</h1>
+        </div>
+
+        <div className="p-5 max-w-md mx-auto space-y-4 animate-slide-up">
+          {/* Order ID & Status */}
+          <Card className="p-6 text-center bg-secondary/30 border-border/50">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2 font-600">Order ID</p>
+            <p className="text-3xl font-heading font-800 text-primary tracking-wider mb-4">{selectedOrder.orderId}</p>
+            <Badge variant={selectedOrder.served ? "default" : "secondary"} className="px-3 py-1 text-sm">
+              {selectedOrder.served ? "✅ Order Completed" : "🍳 Preparing Order"}
+            </Badge>
+          </Card>
+
+          {/* Payment Info */}
+          <div className="flex items-center justify-center gap-3 py-3">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${selectedOrder.paymentMethod === "online" ? "bg-primary/20 text-primary" : "bg-emerald-500/20 text-emerald-500"}`}>
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-700 text-foreground">
+                {selectedOrder.paymentMethod === "online" ? "Paid via UPI/Online" : "Cash Payment"}
+              </p>
+              <p className="text-xs text-muted-foreground font-500">
+                Status: <span className={`capitalize ${selectedOrder.paymentStatus === 'paid' ? 'text-emerald-500' : 'text-amber-500'}`}>{selectedOrder.paymentStatus}</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Items & Total */}
+          <Card className="p-5">
+            <div className="flex items-start gap-3 mb-5">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-lg">🏪</span>
+              </div>
+              <div>
+                <p className="font-heading font-700 text-base">{selectedOrder.shopName || "Canteen"}</p>
+                <p className="text-xs text-muted-foreground">{selectedOrder.shopAddress || "Main Block"}</p>
+                <p className="text-xs text-muted-foreground mt-1 font-500">{formatDateTime(selectedOrder.createdAt)}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 mt-4 pt-4 border-t border-border">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider font-700 mb-2">Order Items</p>
+              {selectedOrder.items.map((item, i) => (
+                <div key={i} className="flex justify-between text-sm">
+                  <span className="font-500">
+                    {item.name} 
+                    <span className="text-muted-foreground ml-1 text-xs">x{item.cartQuantity}</span>
+                  </span>
+                  <span className="font-600">₹{item.price * item.cartQuantity}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-border space-y-2">
+              {(selectedOrder.subtotal !== undefined) && (
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span className="font-500">₹{selectedOrder.subtotal}</span>
+                </div>
+              )}
+              {(selectedOrder.discount ? selectedOrder.discount > 0 : false) && (
+                <div className="flex justify-between text-sm text-accent">
+                  <span className="font-600">Discount Applied</span>
+                  <span className="font-600">-₹{selectedOrder.discount}</span>
+                </div>
+              )}
+              <div className="flex justify-between mt-3 pt-3 border-t border-border">
+                <span className="font-heading font-700 text-lg">Total Amount</span>
+                <span className="font-heading font-700 text-primary text-xl">₹{selectedOrder.total}</span>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <div className="bg-card border-b border-border px-5 py-4 flex items-center gap-3 sticky top-0 z-10">
@@ -1207,7 +1319,11 @@ const OrderHistoryScreen = ({ onBack }: { onBack: () => void }) => {
           </div>
         ) : (
           orders.map((order) => (
-            <Card key={order.id} className="p-4">
+            <Card 
+              key={order.id} 
+              className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+              onClick={() => setSelectedOrder(order)}
+            >
               <div className="flex justify-between items-start mb-3">
                 <div>
                   <p className="font-heading font-700 text-lg">{order.orderId}</p>
